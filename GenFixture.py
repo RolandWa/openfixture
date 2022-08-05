@@ -266,37 +266,41 @@ class GenFixture:
         if os.name == 'nt':
             dxfout = path + '\\' + self.prj_name + "-fixture.dxf"
             pngout = path + '\\' + self.prj_name + "-fixture.png"
-            testout = path + '\\' + self.prj_name + "-test.dxf"
+            #testout = path + '\\' + self.prj_name + "-test.dxf"
         else :
             dxfout = path + "/" + self.prj_name + "-fixture.dxf"
             pngout = path + "/" + self.prj_name + "-fixture.png"
-            testout = path + "/" + self.prj_name + "-test.dxf"
+            #testout = path + "/" + self.prj_name + "-test.dxf"
 
         # This will take a while, print something
-        print("Generating Fixture...\n")
+        print("\nGenerating Fixture...\n")
         
         if os.name == 'nt':
             # Create test part    
             #print("openscad {} -D \"mode=\"\"testcut\"\"\" -o {} openfixture.scad".format(args, testout))
-            os.system("openscad %s -D \"mode=\"\"testcut\"\"\" -o %s openfixture.scad" % (args, testout))
+            #os.system("openscad %s -D \"mode=\"\"testcut\"\"\" -o %s openfixture.scad" % (args, testout))
 
             # Create rendering
+            print("Create a rendering \n")
             #print("openscad {} -D \"mode=\"\"3dmodel\"\"\" --render -o {} openfixture.scad".format(args, pngout))
             os.system("openscad %s -D \"mode=\"\"3dmodel\"\"\" --render -o %s openfixture.scad" % (args, pngout))
 
             # Create laser cuttable fixture
-            #print("openscad {} -D \"mode=\"\"lasercut\"\"\" -o {} openfixture.scad".format(args,dxfout))
+            print("\nCreate a laser cut fixture \n")
+            print("openscad {} -D \"mode=\"\"lasercut\"\"\" -o {} openfixture.scad".format(args,dxfout))
             os.system("openscad %s -D \"mode=\"\"lasercut\"\"\" -o %s openfixture.scad" % (args, dxfout))
         else :
             # Create test part
             #print("openscad {} -D\'mode=\"testcut\"\' -o {} openfixture.scad".format(args, testout))
-            os.system("openscad %s -D\'mode=\"testcut\"\' -o %s openfixture.scad" % (args, testout))
+            #os.system("openscad %s -D\'mode=\"testcut\"\' -o %s openfixture.scad" % (args, testout))
 
             # Create rendering
+            print("Create a rendering \n")
             #print("openscad {} -D\'mode=\"3dmodel\"\' --render -o {} openfixture.scad".format(args, pngout))
             os.system("openscad %s -D\'mode=\"3dmodel\"\' --render -o %s openfixture.scad" % (args, pngout))
 
             # Create laser cuttable fixture
+            print("\nCreate a laser cut fixture \n")
             #print("openscad {} -D\'mode=\"lasercut\"\' -o {} openfixture.scad".format(args,dxfout))
             os.system("openscad %s -D\'mode=\"lasercut\"\' -o %s openfixture.scad" % (args, dxfout))
         
@@ -311,7 +315,7 @@ class GenFixture:
 
     def GetTestPoints(self):
 
-        print("Test pint matrix :\n")
+        print("Test point matrix :\n")
         # Iterate over all pads
         for m in self.brd.GetModules():
 
@@ -340,7 +344,7 @@ class GenFixture:
                     else:
                         x = self.dims[0] - (self.Round(tp[0] - self.origin[0]))
                     y = self.Round(tp[1] - self.origin[1])
-                    print "tp[%s] = (%f, %f)" % (p.GetNetname(),x,y)
+                    print "TP[%s] = (%f, %f)" % (p.GetNetname(),x,y)
 
                     # Check if less than min
                     if y < self.min_y:
@@ -417,8 +421,8 @@ class GenFixture:
         # Calculate dimensions
         self.dims[0] = self.Round(max_x - self.origin[0])
         self.dims[1] = self.Round(max_y - self.origin[1])
-        print("Board dimension :\n")
-        print("dims0x: {} dims1y: {}".format(self.dims[0],self.dims[1]))
+        print("Board dimension : ")
+        print("dims0x: {} dims1y: {} \n".format(self.dims[0],self.dims[1]))
 
 
 if __name__ == '__main__':

@@ -1,11 +1,16 @@
-@echo off 
+REM @echo off 
 REM  Wrapper around python wrapper to generate fixture with my geometry
 REM Only argument is .kicad_board file
+TITLE OpenSCAD fixture generator
 
 setlocal
 
 REM Patch to openscad
 IF EXIST "C:\Program Files\OpenSCAD" SET PATH=%PATH%;"C:\Program Files\OpenSCAD\"
+
+REM Patch to KiCad
+IF EXIST "C:\Program Files\KiCad\bin" SET KICAD = "C:\Program Files\KiCad\bin\"
+REM IF EXIST "C:\Program Files\KiCad\6.0\bin" SET KICAD = "C:\Program Files\KiCad\6.0\bin\"
 
 set BOARD=%1
 
@@ -28,6 +33,5 @@ set NUT_F2F=5.45
 set NUT_C2C=6.10
 set POGO_UNCOMPRESSED_LENGTH=16
 
-"c:\Program Files\KiCad\bin\python.exe" GenFixture.py --board %BOARD% --layer %LAYER% --rev %REV% --mat_th %MAT% --pcb_th %PCB% --out %OUTPUT% --screw_len %SCREW_LEN% --screw_d %SCREW_D% --washer_th %WASHER_TH% --nut_th %NUT_TH% --nut_f2f %NUT_F2F% --nut_c2c %NUT_C2C% --border %BORDER% --pogo-uncompressed-length %POGO_UNCOMPRESSED_LENGTH%
-
-
+ECHO "KiCAD Location : " %KICAD%
+"C:\Program Files\KiCad\bin\python.exe" GenFixture.py --board %BOARD% --layer %LAYER% --rev %REV% --mat_th %MAT% --pcb_th %PCB% --out %OUTPUT% --screw_len %SCREW_LEN% --screw_d %SCREW_D% --washer_th %WASHER_TH% --nut_th %NUT_TH% --nut_f2f %NUT_F2F% --nut_c2c %NUT_C2C% --border %BORDER% --pogo-uncompressed-length %POGO_UNCOMPRESSED_LENGTH%
