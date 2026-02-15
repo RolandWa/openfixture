@@ -638,6 +638,82 @@ Remember to copy the template and never commit your personal config!"
 
 ---
 
+### 3.7 Quick Security Reference
+
+**⚡ Fast Pre-Commit Checks**
+
+```bash
+# One-line security scan (run before every commit)
+git diff --cached | grep -iE "(C:\\\\Users|/home/[^/]+/|OneDrive.*-|username|company)" && echo "⚠️  STOP: Sensitive data found!" || echo "✅ Clean"
+
+# PowerShell version
+git diff --cached | Select-String -Pattern "C:\\Users\\[^\\]+|OneDrive.*-.*Inc" -CaseSensitive:$false
+```
+
+**🔒 Common Mistakes to Avoid**
+
+| ❌ Don't Do This | ✅ Do This Instead |
+|-----------------|-------------------|
+| `C:\Users\John\...` | `$env:USERPROFILE\...` or config file |
+| `$PluginsDir = "C:\My\Path"` | Load from `sync_to_kicad_config.ps1` |
+| `example_board.kicad_pcb` in repo | Add `*.kicad_pcb` to `.gitignore` |
+| Author: "John Doe - ACME Corp" | Author: Project contact only |
+| `git add .` blindly | `git diff --cached` first, then commit |
+
+**🛡️ Security Best Practices**
+
+1. **Always use configuration templates**
+   - Commit: `config.template` 
+   - Ignore: `config.local` or actual config file
+   - Document: How to copy and customize
+
+2. **Verify before pushing**
+   ```bash
+   # What will be pushed?
+   git log origin/master..HEAD --oneline
+   
+   # Check commit messages too
+   git log --oneline -5 | grep -iE "company|username"
+   ```
+
+3. **If you accidentally commit sensitive data**
+   ```bash
+   # Amend last commit (if not pushed)
+   git commit --amend
+   
+   # Remove from history (if already pushed - use carefully)
+   git reset --hard HEAD~1
+   git push --force
+   ```
+
+**📋 File Types to Always Protect**
+
+```gitignore
+# Configuration files with paths
+*_config.ps1          # Except .template files
+*_local.*             # Any local config
+*.local.*             # Alternative pattern
+
+# IDE settings with machine-specific paths
+.vscode/settings.json
+.idea/workspace.xml
+
+# Personal test data
+*_test_local.*
+*_personal.*
+my_*.*
+```
+
+**💡 Pro Tips**
+
+- Set up a git pre-commit hook to auto-scan for sensitive data
+- Use `git secrets` tool or similar for automatic detection
+- Keep personal config in a separate, non-tracked directory
+- Review PR diffs carefully - GitHub shows full paths in diffs
+- Use environment variable names that don't reveal info: ❌ `ACME_CORP_PATH` ✅ `KICAD_PLUGIN_DIR`
+
+---
+
 ### 3.7 Handling Existing Sensitive Data
 
 If sensitive data is already committed:
