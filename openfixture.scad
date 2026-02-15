@@ -30,10 +30,10 @@ test_points=[[17.95,5.83],[35.47,27.73],[44.63,1.65],[34.75,12.72],[20.14,20.57]
 tp_min_y = 13.7;
 
 // DXF outline of pcb
-pcb_outline = "./fixture-rev_11/Smart_Tap_Dongle-outline.dxf";
+pcb_outline = "./fixture/example_board-outline.dxf";
 //pcb_outline = "./rfid_fob-outline.dxf";
 osh_logo = "./osh_logo.dxf";
-pcb_track = "./fixture-rev_11/Smart_Tap_Dongle-track.dxf";
+pcb_track = "./fixture/example_board-track.dxf";
 
 // PCB revision
 rev = "rev.1";

@@ -1,0 +1,36 @@
+# ============================================
+# OpenFixture - KiCad Sync Configuration Template
+# ============================================
+# 
+# SECURITY NOTICE:
+# This is a TEMPLATE file. To use it:
+# 1. Copy this file to: sync_to_kicad_config.ps1
+# 2. Edit sync_to_kicad_config.ps1 with your personal paths
+# 3. NEVER commit sync_to_kicad_config.ps1 to version control
+#
+# The .gitignore file is configured to exclude sync_to_kicad_config.ps1
+# ============================================
+
+# KiCad plugins directory path
+# Replace this with YOUR KiCad plugins directory
+$PluginsDir = "C:\Users\YOUR_USERNAME\AppData\Roaming\kicad\9.0\3rdparty\plugins"
+
+# Alternative locations (uncomment and modify as needed):
+# Windows - Standard installation:
+# $PluginsDir = "$env:APPDATA\kicad\9.0\3rdparty\plugins"
+#
+# Windows - OneDrive:
+# $PluginsDir = "$env:OneDrive\path\to\kicad\9.0\3rdparty\plugins"
+#
+# Windows - Custom location:
+# $PluginsDir = "C:\Custom\Path\KiCad\9.0\3rdparty\plugins"
+#
+# Linux:
+# $PluginsDir = "$HOME/.local/share/kicad/9.0/3rdparty/plugins"
+#
+# macOS:
+# $PluginsDir = "$HOME/Library/Application Support/kicad/9.0/3rdparty/plugins"
+
+# Optional: Additional custom settings
+# $EnableVerboseOutput = $true
+# $BackupBeforeSync = $true

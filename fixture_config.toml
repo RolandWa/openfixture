@@ -1,0 +1,151 @@
+# OpenFixture Configuration File
+# TOML format for fixture generation parameters
+#
+# This file allows you to define project-specific fixture parameters
+# Command-line arguments will override these settings
+#
+# Last Updated: February 15, 2026
+
+# ============================================================================
+# BOARD PARAMETERS
+# ============================================================================
+[board]
+# PCB thickness in millimeters
+# Standard values: 0.8, 1.0, 1.6, 2.0, 2.4
+thickness_mm = 1.6
+
+# Test point layer selection
+# Options: "F.Cu" (front/top), "B.Cu" (back/bottom)
+test_layer = "F.Cu"
+
+# Override board revision (optional)
+# If not set, reads from PCB file title block
+# revision = "rev_01"
+
+# ============================================================================
+# MATERIAL PARAMETERS
+# ============================================================================
+[material]
+# Material thickness in millimeters
+# Common acrylic: 2.45, 3.0, 4.0
+# Common plywood: 3.0, 5.0
+thickness_mm = 3.0
+
+# Laser kerf compensation (handled in OpenSCAD)
+# Typical: 0.1-0.2mm for acrylic
+# kerf_mm = 0.125
+
+# ============================================================================
+# HARDWARE PARAMETERS
+# ============================================================================
+[hardware]
+# Screw specifications (M3 recommended)
+screw_diameter_mm = 3.0
+screw_length_mm = 16.0
+
+# Hex nut dimensions (M3 typical values)
+nut_thickness_mm = 2.4
+nut_flat_to_flat_mm = 5.45
+nut_corner_to_corner_mm = 6.10
+
+# Washer thickness (optional, for smoother hinge operation)
+washer_thickness_mm = 1.0
+
+# Pivot hole diameter (tight fit for alignment)
+# Default: screw_diameter - 0.1
+# For bushing: 5.12
+pivot_diameter_mm = 2.9
+
+# PCB support border width
+# Ledge that holds PCB in place
+border_mm = 0.8
+
+# Pogo pin specifications
+pogo_uncompressed_length_mm = 16.0
+# pogo_compression_mm = 1.0  # Target compression (handled in OpenSCAD)
+# pogo_diameter_mm = 1.5     # Receptacle diameter (handled in OpenSCAD)
+
+# ============================================================================
+# LAYER CONFIGURATION
+# ============================================================================
+[layers]
+# Force include layer - pads on this layer are always test points
+# Default: Eco2.User
+force_layer = "Eco2.User"
+
+# Ignore layer - pads on this layer are never test points
+# Default: Eco1.User
+ignore_layer = "Eco1.User"
+
+# ============================================================================
+# OUTPUT SETTINGS
+# ============================================================================
+[output]
+# Output directory (relative to project)
+directory = "fixture"
+
+# Generate additional files
+export_test_cut = true       # Small test piece for material verification
+export_3d_preview = true     # PNG rendering of assembled fixture
+export_validation = true     # Track overlay for test point verification
+
+# ============================================================================
+# EXAMPLE CONFIGURATIONS FOR COMMON SCENARIOS
+# ============================================================================
+
+# Standard Configuration (1.6mm PCB, 3mm acrylic)
+# [board]
+# thickness_mm = 1.6
+# [material]
+# thickness_mm = 3.0
+# [hardware]
+# screw_diameter_mm = 3.0
+# screw_length_mm = 16.0
+
+# Thin PCB Configuration (0.8mm PCB, 2.5mm acrylic)
+# [board]
+# thickness_mm = 0.8
+# [material]
+# thickness_mm = 2.45
+# [hardware]
+# screw_length_mm = 14.0
+
+# Heavy-duty Configuration (2.0mm PCB, 5mm plywood)
+# [board]
+# thickness_mm = 2.0
+# [material]
+# thickness_mm = 5.0
+# [hardware]
+# screw_length_mm = 20.0
+# border_mm = 1.5
+
+# ============================================================================
+# NOTES
+# ============================================================================
+#
+# Material Thickness:
+#   - Measure actual material with calipers
+#   - Laser-cut materials can vary ±0.1mm
+#   - Use test cut to verify fit
+#
+# Screw Length:
+#   - Measure threaded length only (not head)
+#   - Must be: screw_length >= material_thickness + pcb_thickness + nut_thickness + 3mm
+#   - Excess length improves clamping but requires more clearance
+#
+# Nut Dimensions:
+#   - Measure with calipers (varies by manufacturer)
+#   - Flat-to-flat: Across parallel sides
+#   - Corner-to-corner: Across diagonal
+#   - Undersized holes can be carefully drilled out
+#
+# Pogo Pins:
+#   - Uncompressed length: From receptacle top to pin tip
+#   - Target compression: 1mm typical for good contact
+#   - Force: 50-100g recommended (too many high-force pins = hard to close)
+#
+# Test Points:
+#   - Default: SMD pads without paste mask
+#   - Force include: Add Eco2.User layer to pad
+#   - Ignore: Add Eco1.User layer to pad
+#   - Minimum size: 0.5mm diameter for reliable probing

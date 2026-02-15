@@ -1,0 +1,163 @@
+# ============================================
+# OpenFixture .gitignore
+# Prevents sensitive and personal data from being committed
+# ============================================
+
+# ----------------
+# Personal Configuration Files (SECURITY CRITICAL)
+# ----------------
+sync_to_kicad_config.ps1
+*_config_local.ps1
+*_local.toml
+*.local.*
+
+# User-specific paths and settings
+user_paths.txt
+local_settings.json
+
+# ----------------
+# Python
+# ----------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+pip-wheel-metadata/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.manifest
+*.spec
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv
+
+# ----------------
+# IDEs and Editors
+# ----------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.project
+.cproject
+.settings/
+*.sublime-project
+*.sublime-workspace
+.DS_Store
+
+# ----------------
+# KiCAD Generated Files
+# ----------------
+*.kicad_pcb-bak
+*.kicad_sch-bak
+*-cache.lib
+*-rescue.lib
+*.bck
+*.bak
+fp-info-cache
+*.kicad_prl
+*.xml
+
+# ----------------
+# OpenFixture Generated Output
+# ----------------
+# Fixture output directories
+fixture*/
+*-fixture/
+*.dxf
+!osh_logo.dxf
+!rfid_fob-outline.dxf
+*.stl
+!openfixture.stl
+
+# OpenSCAD temporary files
+*.scad~
+
+# ----------------
+# Laser Cutting Files
+# ----------------
+*.dxf.bak
+*.svg.bak
+
+# ----------------
+# System Files
+# ----------------
+Thumbs.db
+Desktop.ini
+.Spotlight-V100
+.Trashes
+._*
+
+# ----------------
+# Logs and Temporary Files
+# ----------------
+*.log
+*.tmp
+*.temp
+*.cache
+logs/
+tmp/
+temp/
+
+# ----------------
+# Backup and Copy Files
+# ----------------
+*_backup.*
+*_old.*
+*.orig
+
+# Archive files (unless explicitly needed)
+# *.zip
+# *.tar.gz
+# *.rar
+
+# ----------------
+# Documentation Build Output
+# ----------------
+_build/
+.doctrees/
+htmlcov/
+
+# ----------------
+# Test and Coverage
+# ----------------
+.pytest_cache/
+.coverage
+.tox/
+.hypothesis/
+coverage.xml
+*.cover
+
+# ----------------
+# Project Specific
+# ----------------
+# Exclude anything with "Copy" in the name (often duplicates)
+*Copy*.py
+*Copy*.bat
+*Copy*.sh
+*Copy*.md
+*Copy*.scad
+*Copy*.dxf
+
+# Keep specific copies if needed (uncomment if you want to track them)
+# !important-Copy.py
