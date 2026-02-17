@@ -375,6 +375,12 @@ class GenFixture:
         - No paste mask (exposed copper)
         - On force layer OR not on ignore layer
         
+        PTH pad detection:
+        - Only includes PTH pads from components on the OPPOSITE side
+        - Example: Testing from bottom (B.Cu) → Only PTH pads from top components (F.Cu)
+        - Rationale: Component body blocks access from one side, through-hole pins
+          are accessible from the opposite side (e.g., connector on top, test from bottom)
+        
         Note: Through-hole pads (PTH) allow testing connector pins from the
         opposite side of the board. Use checkboxes to control which pad types
         are included as test points.
@@ -405,6 +411,9 @@ class GenFixture:
             
             # Iterate over all footprints (modern API: GetFootprints instead of GetModules)
             for footprint in self.brd.GetFootprints():
+                # Get the layer where the component is placed (F.Cu or B.Cu)
+                component_layer = footprint.GetLayer()
+                
                 # Iterate over all pads
                 for pad in footprint.Pads():
                     # Check if pad is on current processing layer
@@ -426,6 +435,13 @@ class GenFixture:
                             continue  # SMD not included
                         elif pad_attr == pcbnew.PAD_ATTRIB_PTH and not self.config.include_pth:
                             continue  # PTH not included
+                        elif pad_attr == pcbnew.PAD_ATTRIB_PTH and self.config.include_pth:
+                            # Only use PTH pads from components on the OPPOSITE side
+                            # If testing from top (F.Cu), only use PTH from bottom components (B.Cu)
+                            # If testing from bottom (B.Cu), only use PTH from top components (F.Cu)
+                            if component_layer == process_layer:
+                                logger.debug(f"  Skipping PTH pad {pad.GetNetname()} - component on same side as test layer")
+                                continue  # Component on same side - pins blocked by component body
                         elif (pad_attr != pcbnew.PAD_ATTRIB_SMD and 
                               pad_attr != pcbnew.PAD_ATTRIB_PTH):
                             continue  # Only SMD and PTH are valid

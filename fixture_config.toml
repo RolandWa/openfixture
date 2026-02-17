@@ -29,6 +29,9 @@ test_layer = "F.Cu"
 # Pad types to include as test points
 # SMD: Surface mount pads (designed test points)
 # PTH: Plated through-hole pads (connector pins, component leads)
+#      Note: PTH pads are only detected from components on the OPPOSITE side
+#      Example: Testing from bottom → Only uses PTH from top-side components
+#      Reason: Component body blocks access, pins accessible from other side
 include_smd_pads = true
 include_pth_pads = true
 

@@ -115,6 +115,9 @@ python3 GenFixture.py \
 
 ### Test Point Extraction
 - Automatic detection of SMD pads without paste mask
+- **PTH (through-hole) pad support**: Detects connector pins and component leads from opposite side
+  - Example: Connector on top → Test pins from bottom layer
+  - Only includes PTH pads from components on the opposite side (component body would block same-side access)
 - Force include/exclude layers support
 - **Single-sided testing**: Top side (F.Cu) OR bottom side (B.Cu)
 - Coordinate transformation and mirroring
