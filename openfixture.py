@@ -237,22 +237,44 @@ class OpenFixtureDialog(wx.Dialog):
         sizer.Add(wx.StaticLine(panel), 0, wx.EXPAND | wx.ALL, 10)
         
         # Test point layer
-        sizer.Add(wx.StaticText(panel, wx.ID_ANY, "Test Point Layer:"), 0, wx.ALL, 5)
+        sizer.Add(wx.StaticText(panel, wx.ID_ANY, "Layer for pogo pins:"), 0, wx.ALL, 5)
         
-        self.layer_top = wx.RadioButton(panel, wx.ID_ANY, "Top (F.Cu)", style=wx.RB_GROUP)
-        self.layer_bottom = wx.RadioButton(panel, wx.ID_ANY, "Bottom (B.Cu)")
+        self.layer_top = wx.CheckBox(panel, wx.ID_ANY, "Top Layer (F.Cu)")
+        self.layer_bottom = wx.CheckBox(panel, wx.ID_ANY, "Bottom Layer (B.Cu)")
         self.layer_top.SetValue(True)
+        
+        # Bind events for mutual exclusion (radio button behavior)
+        self.layer_top.Bind(wx.EVT_CHECKBOX, self._on_layer_top_checked)
+        self.layer_bottom.Bind(wx.EVT_CHECKBOX, self._on_layer_bottom_checked)
         
         sizer.Add(self.layer_top, 0, wx.ALL, 5)
         sizer.Add(self.layer_bottom, 0, wx.ALL, 5)
         
         sizer.Add(wx.StaticLine(panel), 0, wx.EXPAND | wx.ALL, 10)
         
+        # Pad type selection
+        sizer.Add(wx.StaticText(panel, wx.ID_ANY, "Pad Types to Include:"), 0, wx.ALL, 5)
+        
+        self.include_smd = wx.CheckBox(panel, wx.ID_ANY, "SMD pads (surface mount test points)")
+        self.include_smd.SetValue(True)
+        sizer.Add(self.include_smd, 0, wx.ALL, 5)
+        
+        self.include_pth = wx.CheckBox(panel, wx.ID_ANY, "PTH pads (through-hole pins/connectors)")
+        self.include_pth.SetValue(True)
+        sizer.Add(self.include_pth, 0, wx.ALL, 5)
+        
+        sizer.Add(wx.StaticLine(panel), 0, wx.EXPAND | wx.ALL, 10)
+        
         # Help text
         help_text = wx.StaticText(panel, wx.ID_ANY,
-            "Test points are SMD pads without paste mask.\n"
-            "Use Eco2.User layer to force include pads.\n"
-            "Use Eco1.User layer to ignore pads.")
+            "Test points detected:\n"
+            "• Pads without solder paste mask\n"
+            "• TP* reference designators (Test Point symbols)\n"
+            "• Eco2.User layer: force include specific pads\n"
+            "• Eco1.User layer: exclude specific pads\n\n"
+            "NOTE: Select ONE side only (Top OR Bottom).\n"
+            "Physical fixture supports single-sided testing.\n"
+            "PTH pads allow testing connectors from opposite side.")
         help_text.SetForegroundColour(wx.Colour(100, 100, 100))
         sizer.Add(help_text, 0, wx.ALL, 10)
         
@@ -383,7 +405,7 @@ class OpenFixtureDialog(wx.Dialog):
         border_sizer = wx.BoxSizer(wx.HORIZONTAL)
         border_sizer.Add(wx.StaticText(panel, wx.ID_ANY, "PCB Support Border (mm):"), 0,
                         wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        self.border = wx.TextCtrl(panel, wx.ID_ANY, "0.8")
+        self.border = wx.TextCtrl(panel, wx.ID_ANY, "1.0")
         border_sizer.Add(self.border, 1, wx.ALL, 5)
         sizer.Add(border_sizer, 0, wx.EXPAND)
         
@@ -397,6 +419,11 @@ class OpenFixtureDialog(wx.Dialog):
         
         sizer.Add(wx.StaticLine(panel), 0, wx.EXPAND | wx.ALL, 10)
         
+        # Verbose logging checkbox
+        self.verbose_logging = wx.CheckBox(panel, wx.ID_ANY, "Enable Verbose Logging (creates log file)")
+        self.verbose_logging.SetValue(False)
+        sizer.Add(self.verbose_logging, 0, wx.ALL, 10)
+        
         # Help text
         help_text = wx.StaticText(panel, wx.ID_ANY,
             "Optional parameters for fine-tuning.\n"
@@ -406,6 +433,24 @@ class OpenFixtureDialog(wx.Dialog):
         
         panel.SetSizer(sizer)
         return panel
+    
+    def _on_layer_top_checked(self, event):
+        """Handle top layer checkbox - ensure mutual exclusion"""
+        if self.layer_top.GetValue():
+            # Top checked, uncheck bottom
+            self.layer_bottom.SetValue(False)
+        elif not self.layer_bottom.GetValue():
+            # If unchecking top and bottom is not checked, recheck top (at least one must be selected)
+            self.layer_top.SetValue(True)
+    
+    def _on_layer_bottom_checked(self, event):
+        """Handle bottom layer checkbox - ensure mutual exclusion"""
+        if self.layer_bottom.GetValue():
+            # Bottom checked, uncheck top
+            self.layer_top.SetValue(False)
+        elif not self.layer_top.GetValue():
+            # If unchecking bottom and top is not checked, recheck bottom (at least one must be selected)
+            self.layer_bottom.SetValue(True)
     
     def _load_defaults(self):
         """Load default values from config file if available"""
@@ -431,7 +476,13 @@ class OpenFixtureDialog(wx.Dialog):
                     self.pcb_thickness.SetValue(str(board['thickness_mm']))
                 if 'test_layer' in board:
                     if board['test_layer'] == 'B.Cu':
+                        self.layer_top.SetValue(False)
                         self.layer_bottom.SetValue(True)
+                    # Note: 'both' mode not supported by physical fixture design
+                    # If config specifies 'both', default to top layer
+                    elif board['test_layer'] == 'both':
+                        self.layer_top.SetValue(True)
+                        self.layer_bottom.SetValue(False)
             
             # Load material parameters
             if 'material' in config:
@@ -459,6 +510,20 @@ class OpenFixtureDialog(wx.Dialog):
                 if 'pogo_uncompressed_length_mm' in hw:
                     self.pogo_length.SetValue(str(hw['pogo_uncompressed_length_mm']))
             
+            # Load advanced/debugging parameters
+            if 'advanced' in config:
+                advanced = config['advanced']
+                if 'verbose_logging' in advanced:
+                    self.verbose_logging.SetValue(bool(advanced['verbose_logging']))
+            
+            # Load test point detection parameters
+            if 'test_points' in config:
+                tp = config['test_points']
+                if 'include_smd_pads' in tp:
+                    self.include_smd.SetValue(bool(tp['include_smd_pads']))
+                if 'include_pth_pads' in tp:
+                    self.include_pth.SetValue(bool(tp['include_pth_pads']))
+            
             logger.info("Loaded defaults from configuration file")
             
         except Exception as e:
@@ -466,12 +531,25 @@ class OpenFixtureDialog(wx.Dialog):
     
     def get_parameters(self) -> dict:
         """Get all parameters from dialog"""
+        # Determine selected layer based on checkboxes (mutually exclusive)
+        top_checked = self.layer_top.GetValue()
+        bottom_checked = self.layer_bottom.GetValue()
+        
+        # Due to mutual exclusion, only one can be true at a time
+        if top_checked:
+            layer = 'F.Cu'
+        elif bottom_checked:
+            layer = 'B.Cu'
+        else:
+            # Fallback (should not happen with mutual exclusion)
+            layer = 'F.Cu'
+        
         return {
             'board': self.board_path,
             'pcb_th': self.pcb_thickness.GetValue(),
             'mat_th': self.material_thickness.GetValue(),
             'rev': self.revision.GetValue(),
-            'layer': 'F.Cu' if self.layer_top.GetValue() else 'B.Cu',
+            'layer': layer,
             'screw_len': self.screw_length.GetValue(),
             'screw_d': self.screw_diameter.GetValue(),
             'nut_th': self.nut_thickness.GetValue(),
@@ -481,6 +559,9 @@ class OpenFixtureDialog(wx.Dialog):
             'border': self.border.GetValue(),
             'pogo_length': self.pogo_length.GetValue(),
             'output': self.output_text.GetValue(),
+            'verbose': self.verbose_logging.GetValue(),
+            'include_smd': self.include_smd.GetValue(),
+            'include_pth': self.include_pth.GetValue(),
         }
 
 
@@ -625,13 +706,14 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
         )
         return False, error_msg
     
-    def _verify_output_files(self, output_dir: Path, prefix: str) -> tuple[bool, list, list]:
+    def _verify_output_files(self, output_dir: Path, prefix: str, layer: str = None) -> tuple[bool, list, list]:
         """
         Verify that expected output files were generated
         
         Args:
             output_dir: Output directory path
             prefix: File prefix (e.g., board name)
+            layer: Layer selection ('F.Cu', 'B.Cu', or 'both')
         
         Returns:
             tuple: (all_ok, found_files, missing_files)
@@ -639,8 +721,16 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
         expected_files = [
             f"{prefix}-fixture.dxf",
             f"{prefix}-outline.dxf",
-            f"{prefix}-track.dxf",
         ]
+        
+        # Add appropriate track file(s) based on layer selection
+        if layer == 'both':
+            expected_files.extend([
+                f"{prefix}-track_top.dxf",
+                f"{prefix}-track_bottom.dxf",
+            ])
+        else:
+            expected_files.append(f"{prefix}-track.dxf")
         
         optional_files = [
             f"{prefix}-fixture.png",
@@ -689,8 +779,9 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
                 "Test points must be:\n"
                 "• SMD pads\n"
                 "• Without solder paste mask\n"
-                "• On the selected layer (F.Cu or B.Cu)\n\n"
-                "Tip: Use pad properties to remove paste mask."
+                "• On the selected layer (F.Cu, B.Cu, or both)\n\n"
+                "Tip: Use pad properties to remove paste mask.\n"
+                "Tip: Use Eco2.User layer to force include specific pads."
             )
         
         if "openscad" in error_lower and ("not found" in error_lower or "no such file" in error_lower):
@@ -736,7 +827,7 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
             # Continue anyway - user might have OpenSCAD in a custom location
             logger.warning("OpenSCAD not detected, continuing anyway...")
         
-        # Find GenFixture_v2.py - check multiple locations
+        # Find GenFixture.py - check multiple locations
         plugin_dir = Path(__file__).parent
         
         # Search priority:
@@ -744,21 +835,21 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
         # 2. openfixture_support subdirectory (for organized installations)
         # 3. Parent directory (for development)
         search_paths = [
-            plugin_dir / "GenFixture_v2.py",
-            plugin_dir / "openfixture_support" / "GenFixture_v2.py",
-            plugin_dir.parent / "GenFixture_v2.py"
+            plugin_dir / "GenFixture.py",
+            plugin_dir / "openfixture_support" / "GenFixture.py",
+            plugin_dir.parent / "GenFixture.py"
         ]
         
         genfixture_path = None
         for path in search_paths:
             if path.exists():
                 genfixture_path = path
-                logger.info(f"Found GenFixture_v2.py at: {path}")
+                logger.info(f"Found GenFixture.py at: {path}")
                 break
         
         if not genfixture_path:
             wx.MessageBox(
-                "Could not find GenFixture_v2.py.\n\n"
+                "Could not find GenFixture.py.\n\n"
                 "Expected locations:\n"
                 f"• {plugin_dir}\n"
                 f"• {plugin_dir / 'openfixture_support'}\n\n"
@@ -795,6 +886,16 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
             '--pogo-uncompressed-length', params['pogo_length'],
         ]
         
+        # Add verbose flag if enabled
+        if params.get('verbose', False):
+            cmd.append('--verbose')
+        
+        # Add pad type flags
+        if params.get('include_smd', True):
+            cmd.append('--include-smd')
+        if params.get('include_pth', True):
+            cmd.append('--include-pth')
+        
         # Show progress dialog
         progress = wx.ProgressDialog(
             "Generating Fixture",
@@ -821,15 +922,28 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
             if result.returncode == 0:
                 # Verify output files were actually created
                 board_name = Path(params['board']).stem
-                all_ok, found_files, missing_files = self._verify_output_files(output_dir, board_name)
+                all_ok, found_files, missing_files = self._verify_output_files(
+                    output_dir, board_name, params['layer']
+                )
                 
                 if all_ok:
                     # Success - all required files generated
                     file_list = "\n".join([f"  ✅ {f}" for f in found_files])
+                    
+                    # Check if log file was created (verbose mode)
+                    log_msg = ""
+                    if params.get('verbose', False):
+                        # Find the log file in output directory
+                        import glob
+                        log_files = glob.glob(str(output_dir / "openfixture_*.log"))
+                        if log_files:
+                            log_file = Path(log_files[-1]).name  # Get most recent
+                            log_msg = f"\n\nVerbose log: {log_file}"
+                    
                     wx.MessageBox(
                         f"Fixture generated successfully!\n\n"
                         f"Output directory: {output_dir}\n\n"
-                        f"Files generated:\n{file_list}\n\n"
+                        f"Files generated:\n{file_list}{log_msg}\n\n"
                         f"Opening output directory...",
                         "Success",
                         wx.OK | wx.ICON_INFORMATION

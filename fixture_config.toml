@@ -15,12 +15,28 @@
 thickness_mm = 1.6
 
 # Test point layer selection
-# Options: "F.Cu" (front/top), "B.Cu" (back/bottom)
+# Options: "F.Cu" (front/top), "B.Cu" (back/bottom), "both" (both sides)
 test_layer = "F.Cu"
 
 # Override board revision (optional)
 # If not set, reads from PCB file title block
 # revision = "rev_01"
+
+# ============================================================================
+# TEST POINT DETECTION
+# ============================================================================
+[test_points]
+# Pad types to include as test points
+# SMD: Surface mount pads (designed test points)
+# PTH: Plated through-hole pads (connector pins, component leads)
+include_smd_pads = true
+include_pth_pads = true
+
+# Pad filtering
+# - Pads with solder paste mask are excluded (unless on force_layer)
+# - Pads on ignore_layer (Eco1.User) are excluded
+# - Pads on force_layer (Eco2.User) are always included
+# - Test Point symbols (TP*) from schematic are automatically included
 
 # ============================================================================
 # MATERIAL PARAMETERS
@@ -90,34 +106,29 @@ export_3d_preview = true     # PNG rendering of assembled fixture
 export_validation = true     # Track overlay for test point verification
 
 # ============================================================================
-# EXAMPLE CONFIGURATIONS FOR COMMON SCENARIOS
+# ADVANCED SETTINGS
 # ============================================================================
+[advanced]
+# Enable verbose logging (creates detailed log file)
+verbose_logging = false
 
-# Standard Configuration (1.6mm PCB, 3mm acrylic)
-# [board]
-# thickness_mm = 1.6
-# [material]
-# thickness_mm = 3.0
-# [hardware]
-# screw_diameter_mm = 3.0
-# screw_length_mm = 16.0
+# Coordinate correction offsets (fine-tune alignment)
+# Usually not needed, but can compensate for systematic errors
+tp_correction_offset_x = 0.0
+tp_correction_offset_y = 0.0
 
-# Thin PCB Configuration (0.8mm PCB, 2.5mm acrylic)
-# [board]
-# thickness_mm = 0.8
-# [material]
-# thickness_mm = 2.45
-# [hardware]
-# screw_length_mm = 14.0
+# Minimum angle for pogo pin contact (degrees)
+# Closer to 90° is better for reliable contact
+min_pogo_contact_angle = 89.5
 
-# Heavy-duty Configuration (2.0mm PCB, 5mm plywood)
-# [board]
-# thickness_mm = 2.0
-# [material]
-# thickness_mm = 5.0
-# [hardware]
-# screw_length_mm = 20.0
-# border_mm = 1.5
+# ============================================================================
+# EXAMPLE CONFIGURATIONS
+# ============================================================================
+# Copy and modify these values in the active sections above to match your needs
+#
+# Standard: 1.6mm PCB + 3mm acrylic + M3x16 screws
+# Thin PCB: 0.8mm PCB + 2.45mm acrylic + M3x14 screws  
+# Heavy-duty: 2.0mm PCB + 5mm plywood + M3x20 screws + 1.5mm border
 
 # ============================================================================
 # NOTES

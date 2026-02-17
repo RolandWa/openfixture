@@ -21,8 +21,13 @@ FONTNAME = "Glaser Stencil D";
 //
 // PCB input
 //
-// Test points
-test_points=[[17.95,5.83],[35.47,27.73],[44.63,1.65],[34.75,12.72],[20.14,20.57],[20.06,17.51],[21.12,13.88],[18.96,23.13],];
+// Test points - separate arrays for top and bottom layers
+// For single-sided testing, one array will be empty []
+test_points_top=[[17.95,5.83],[35.47,27.73],[44.63,1.65],[34.75,12.72],[20.14,20.57],[20.06,17.51],[21.12,13.88],[18.96,23.13],];
+test_points_bottom=[];
+
+// Legacy: combined test points (computed from top+bottom)
+test_points = concat(test_points_top, test_points_bottom);
 
 // Used below to calculate distance from hinge to nearest point based on min
 // contact angle... Ideally we want it as close to 90 degrees as possible
@@ -473,12 +478,17 @@ module head_base_common ()
         origin_x = active_x_offset;
         origin_y = active_x_offset + work_area_y;
     
-        // Loop over test points
-        for ( i = [0 : len (test_points) - 1] ) {
-        
+        // Loop over test points - TOP
+        for ( i = [0 : len (test_points_top) - 1] ) {
             // Drop pins for test points
-            translate ([origin_x + test_points[i][0], origin_y - test_points[i][1]])
-            //circle (r = pogo_r, h = mat_th);
+            translate ([origin_x + test_points_top[i][0], origin_y - test_points_top[i][1]])
+            circle (r = pogo_r);
+        }
+        
+        // Loop over test points - BOTTOM
+        for ( i = [0 : len (test_points_bottom) - 1] ) {
+            // Drop pins for test points
+            translate ([origin_x + test_points_bottom[i][0], origin_y - test_points_bottom[i][1]])
             circle (r = pogo_r);
         }
     }
@@ -684,23 +694,19 @@ module carrier (dxf_filename, pcb_x, pcb_y, border)
     x = base_x;
     y = head_y;
     
-    // Calculate scale factors
-    scale_x = 1 - ((2 * border) / pcb_x);
-    scale_y = 1 - ((2 * border) / pcb_y);
-
+    // Border creates a ledge/support around the PCB
+    // Positive border = cutout SMALLER than PCB (creates ledge)
+    // Negative border = cutout LARGER than PCB (clearance)
+    // Zero border = cutout matches PCB exactly
+    
     difference () {
         square ([x, y]);
         
-        // Get scale_offset
-        sx_offset = (pcb_x - (pcb_x * scale_x)) / 2;
-        sy_offset = (pcb_y - (pcb_y * scale_y)) / 2;
-
-        // Import dxf, translate
-        translate ([mat_th + active_x_offset + tp_correction_offset_x, 
-                   work_area_y + active_y_offset + tp_correction_offset_y])
-        translate ([sx_offset, -sy_offset])
+        // Import dxf at full scale, offset by border amount
+        // Border shrinks the cutout by moving inward from edges
+        translate ([mat_th + active_x_offset + tp_correction_offset_x + border, 
+                   work_area_y + active_y_offset + tp_correction_offset_y - border])
         hull () {
-            scale ([scale_x, scale_y])
             import (dxf_filename);
         }
         
@@ -830,12 +836,18 @@ module validate_testpoints (dxf_filename,dxf_track)
     }
     color ([0, 1, 0])
     import (dxf_track);
-    // Loop over test points
-    for ( i = [0 : len (test_points) - 1] ) {
     
-        // Drop pins for test points
+    // Loop over test points - TOP (red)
+    for ( i = [0 : len (test_points_top) - 1] ) {
         color ([1, 0, 0])
-        translate ([test_points[i][0], -test_points[i][1]])
+        translate ([test_points_top[i][0], -test_points_top[i][1]])
+        circle (r = pogo_r);
+    }
+    
+    // Loop over test points - BOTTOM (blue)
+    for ( i = [0 : len (test_points_bottom) - 1] ) {
+        color ([0, 0, 1])
+        translate ([test_points_bottom[i][0], -test_points_bottom[i][1]])
         circle (r = pogo_r);
     }
 }

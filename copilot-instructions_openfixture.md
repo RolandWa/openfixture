@@ -105,10 +105,11 @@ Laser-Cuttable DXF + 3D Model + Validation
 ```python
 class GenFixture:
     # Layer assignments
-    layer = F_Cu          # Test point layer (F.Cu or B.Cu)
+    layer = F_Cu          # Test point layer (F.Cu, B.Cu, or both)
     paste = F_Paste       # Paste layer (to exclude pads)
     ignore_layer = Eco1_User   # Force ignore test points
     force_layer = Eco2_User    # Force include as test points
+    both_sides = False    # Extract test points from both F.Cu and B.Cu
     
     # Board data
     brd = None           # pcbnew.BOARD object
@@ -239,7 +240,7 @@ python GenFixture.py --board <file.kicad_pcb> \
 **Common Optional Arguments**:
 ```bash
 --pcb_th 1.6              # PCB thickness (default: 1.6mm)
---layer B.Cu              # Test point layer (F.Cu or B.Cu)
+--layer B.Cu              # Test point layer (F.Cu, B.Cu, or both)
 --screw_len 16.0          # Screw thread length (default: 14mm)
 --screw_d 3.0             # Screw diameter (default: 3mm)
 --rev "rev_01"            # Revision string (default: from PCB)

@@ -65,6 +65,10 @@ class FixtureConfig:
         # Revision
         self.rev = None
         
+        # Pad type inclusion flags
+        self.include_smd = True
+        self.include_pth = True
+        
     @classmethod
     def from_toml(cls, toml_path: str) -> 'FixtureConfig':
         """Load configuration from TOML file"""
@@ -81,14 +85,16 @@ class FixtureConfig:
         if Path(toml_path).exists():
             with open(toml_path, 'rb') as f:
                 data = tomllib.load(f)
-                
-            # Load parameters from TOML
+            
+            # Board parameters
             board_cfg = data.get('board', {})
             config.pcb_th = board_cfg.get('thickness_mm', DEFAULT_PCB_TH)
             
+            # Material parameters
             material_cfg = data.get('material', {})
             config.mat_th = material_cfg.get('thickness_mm', 0.0)
             
+            # Hardware parameters
             hardware_cfg = data.get('hardware', {})
             config.screw_len = hardware_cfg.get('screw_length_mm', DEFAULT_SCREW_LEN)
             config.screw_d = hardware_cfg.get('screw_diameter_mm', DEFAULT_SCREW_D)
@@ -100,7 +106,19 @@ class FixtureConfig:
             config.border = hardware_cfg.get('border_mm')
             config.pogo_uncompressed_length = hardware_cfg.get('pogo_uncompressed_length_mm')
             
-            config.rev = data.get('revision')
+            # Test point detection configuration
+            test_points_cfg = data.get('test_points', {})
+            config.include_smd = test_points_cfg.get('include_smd_pads', True)
+            config.include_pth = test_points_cfg.get('include_pth_pads', True)
+            
+            # Revision
+            config.rev = board_cfg.get('revision') or data.get('revision')
+            
+            logger.info(f"Loaded configuration from {toml_path}")
+            logger.debug(f"  PCB thickness: {config.pcb_th}mm")
+            logger.debug(f"  Material thickness: {config.mat_th}mm")
+            logger.debug(f"  Include SMD pads: {config.include_smd}")
+            logger.debug(f"  Include PTH pads: {config.include_pth}")
             
         return config
 
@@ -127,40 +145,58 @@ class GenFixture:
         # Mirror flag for back-side testing
         self.mirror = False
         
+        # Both sides flag
+        self.both_sides = False
+        
         # Board data
         self.origin = [float("inf"), float("inf")]
         self.dims = [0.0, 0.0]
         self.min_y = float("inf")
         self.test_points: List[Tuple[float, float]] = []
         
+        # Separate test point lists for both-sides mode
+        self.test_points_top: List[Tuple[float, float]] = []
+        self.test_points_bottom: List[Tuple[float, float]] = []
+        
     def __str__(self) -> str:
+        layer_info = "both sides" if self.both_sides else ("F.Cu" if self.layer == pcbnew.F_Cu else "B.Cu")
+        if self.both_sides:
+            tp_info = f"top={len(self.test_points_top)} bottom={len(self.test_points_bottom)} total={len(self.test_points)}"
+        else:
+            tp_info = f"test_points={len(self.test_points)}"
         return (f"Fixture: origin=({self.origin[0]:.02f},{self.origin[1]:.02f}) "
                 f"dims=({self.dims[0]:.02f},{self.dims[1]:.02f}) "
-                f"min_y={self.min_y:.02f}")
+                f"min_y={self.min_y:.02f} "
+                f"{tp_info} "
+                f"layer={layer_info})")
     
-    def set_layers(self, layer: int = -1, ilayer: int = -1, flayer: int = -1):
+    def set_layers(self, layer: int = -1, ilayer: int = -1, flayer: int = -1, both: bool = False):
         """
         Set layer configuration
         
         Args:
-            layer: Test point layer (F.Cu or B.Cu)
+            layer: Test point layer (F.Cu or B.Cu, ignored if both=True)
             ilayer: Ignore layer (Eco1.User)
             flayer: Force layer (Eco2.User)
+            both: If True, extract test points from both F.Cu and B.Cu
         """
-        if layer != -1:
+        self.both_sides = both
+        
+        if layer != -1 and not both:
             self.layer = layer
         if ilayer != -1:
             self.ignore_layer = ilayer
         if flayer != -1:
             self.force_layer = flayer
         
-        # Setup paste layer and mirror flag
-        if self.layer == pcbnew.F_Cu:
-            self.paste = pcbnew.F_Paste
-            self.mirror = False
-        else:
-            self.paste = pcbnew.B_Paste
-            self.mirror = True
+        # Setup paste layer and mirror flag (used when not in both mode)
+        if not self.both_sides:
+            if self.layer == pcbnew.F_Cu:
+                self.paste = pcbnew.F_Paste
+                self.mirror = False
+            else:
+                self.paste = pcbnew.B_Paste
+                self.mirror = True
     
     def round_value(self, x: float, base: float = 0.01) -> float:
         """Round value to specified precision"""
@@ -216,10 +252,14 @@ class GenFixture:
             except AttributeError:
                 logger.warning("Could not set DXF units, using default")
         
-        # SetDXFPlotPolygonMode (may be removed in KiCAD 9)
+        # SetDXFPlotPolygonMode - CRITICAL for outline cutouts
+        # TRUE = export filled polygons (required for OpenSCAD import)
+        # FALSE = export only line segments (won't create filled cutouts)
         try:
             popt.SetDXFPlotPolygonMode(True)
+            logger.debug("DXF polygon mode enabled (filled shapes)")
         except AttributeError:
+            logger.warning("SetDXFPlotPolygonMode not available - outline may export as lines only")
             pass
         
         # SetPlotFrameRef (may be removed in KiCAD 9)
@@ -285,19 +325,36 @@ class GenFixture:
         except AttributeError:
             pass  # KiCAD 9 doesn't have SetColor
         
-        # Open file and plot layer
+        # Open file and plot layer(s)
         if layer_to_check == "outline":
             pctl.SetLayer(pcbnew.Edge_Cuts)
             pctl.OpenPlotfile("outline", pcbnew.PLOT_FORMAT_DXF, "Edges")
+            logger.debug("Plotting Edge.Cuts layer with polygon mode for filled regions")
+            pctl.PlotLayer()
+            pctl.ClosePlot()
+            logger.debug("Edge.Cuts DXF export complete")
         elif layer_to_check == "track":
-            pctl.SetLayer(self.layer)
-            pctl.OpenPlotfile("track", pcbnew.PLOT_FORMAT_DXF, "track")
-        
-        # Plot layer
-        pctl.PlotLayer()
-        
-        # Close plot
-        pctl.ClosePlot()
+            if self.both_sides:
+                # Plot both F.Cu and B.Cu layers separately for "both sides" mode
+                # Plot F.Cu (top)
+                pctl.SetLayer(pcbnew.F_Cu)
+                pctl.OpenPlotfile("track_top", pcbnew.PLOT_FORMAT_DXF, "track_top")
+                pctl.PlotLayer()
+                pctl.ClosePlot()
+                logger.info("Plotted F.Cu track layer (top)")
+                
+                # Plot B.Cu (bottom)
+                pctl.SetLayer(pcbnew.B_Cu)
+                pctl.OpenPlotfile("track_bottom", pcbnew.PLOT_FORMAT_DXF, "track_bottom")
+                pctl.PlotLayer()
+                pctl.ClosePlot()
+                logger.info("Plotted B.Cu track layer (bottom)")
+            else:
+                # Plot single selected layer
+                pctl.SetLayer(self.layer)
+                pctl.OpenPlotfile("track", pcbnew.PLOT_FORMAT_DXF, "track")
+                pctl.PlotLayer()
+                pctl.ClosePlot()
         
         # Restore origin (KiCAD 8 only)
         if has_aux_origin and aux_origin_save is not None:
@@ -313,53 +370,99 @@ class GenFixture:
         Extract test point coordinates from PCB pads
         
         Test point criteria:
-        - On selected layer (F.Cu or B.Cu)
-        - SMD pad type
+        - On selected layer (F.Cu or B.Cu, or both if both_sides=True)
+        - SMD or PTH (through-hole) pad type (configurable via include_smd/include_pth)
         - No paste mask (exposed copper)
         - On force layer OR not on ignore layer
+        
+        Note: Through-hole pads (PTH) allow testing connector pins from the
+        opposite side of the board. Use checkboxes to control which pad types
+        are included as test points.
         """
         logger.info("Extracting test points...")
+        logger.info(f"  Include SMD pads: {self.config.include_smd}")
+        logger.info(f"  Include PTH pads: {self.config.include_pth}")
+        if self.both_sides:
+            logger.info("Processing test points from BOTH sides (F.Cu + B.Cu)")
+        else:
+            layer_name = "F.Cu" if self.layer == pcbnew.F_Cu else "B.Cu"
+            logger.info(f"Processing test points from {layer_name}")
         logger.info("Test point matrix:")
         
-        # Iterate over all footprints (modern API: GetFootprints instead of GetModules)
-        for footprint in self.brd.GetFootprints():
-            # Iterate over all pads
-            for pad in footprint.Pads():
-                # Check if pad is on selected layer
-                if not pad.IsOnLayer(self.layer):
-                    continue
-                
-                # Check if forcing this pad
-                if pad.IsOnLayer(self.force_layer):
-                    pass  # Include regardless
-                # Check ignore conditions
-                elif (pad.IsOnLayer(self.ignore_layer) or
-                      pad.IsOnLayer(self.paste) or
-                      pad.GetAttribute() != pcbnew.PAD_ATTRIB_SMD):
-                    continue
-                
-                # Get position (modern API returns VECTOR2I)
-                pos = pad.GetPosition()
-                tp_x = pcbnew.ToMM(pos.x)
-                tp_y = pcbnew.ToMM(pos.y)
-                
-                # Round x and y, invert x if mirrored
-                if not self.mirror:
-                    x = self.round_value(tp_x - self.origin[0])
-                else:
-                    x = self.dims[0] - self.round_value(tp_x - self.origin[0])
-                y = self.round_value(tp_y - self.origin[1])
-                
-                logger.info(f"  tp[{pad.GetNetname()}] = ({x:.2f}, {y:.2f})")
-                
-                # Track minimum y coordinate
-                if y < self.min_y:
-                    self.min_y = y
-                
-                # Save coordinates
-                self.test_points.append((x, y))
+        # Determine which layers to process
+        if self.both_sides:
+            layers_to_process = [
+                (pcbnew.F_Cu, pcbnew.F_Paste, False),  # (layer, paste_layer, mirror)
+                (pcbnew.B_Cu, pcbnew.B_Paste, True)
+            ]
+        else:
+            layers_to_process = [(self.layer, self.paste, self.mirror)]
         
-        logger.info(f"Found {len(self.test_points)} test points")
+        # Process each layer
+        for process_layer, process_paste, process_mirror in layers_to_process:
+            layer_name = "F.Cu" if process_layer == pcbnew.F_Cu else "B.Cu"
+            logger.info(f"  Scanning layer: {layer_name}")
+            
+            # Iterate over all footprints (modern API: GetFootprints instead of GetModules)
+            for footprint in self.brd.GetFootprints():
+                # Iterate over all pads
+                for pad in footprint.Pads():
+                    # Check if pad is on current processing layer
+                    if not pad.IsOnLayer(process_layer):
+                        continue
+                    
+                    # Check if forcing this pad
+                    if pad.IsOnLayer(self.force_layer):
+                        pass  # Include regardless
+                    # Check ignore conditions
+                    elif pad.IsOnLayer(self.ignore_layer):
+                        continue  # Explicitly ignored
+                    elif pad.IsOnLayer(process_paste):
+                        continue  # Has paste mask
+                    # Check pad type based on config flags
+                    else:
+                        pad_attr = pad.GetAttribute()
+                        if pad_attr == pcbnew.PAD_ATTRIB_SMD and not self.config.include_smd:
+                            continue  # SMD not included
+                        elif pad_attr == pcbnew.PAD_ATTRIB_PTH and not self.config.include_pth:
+                            continue  # PTH not included
+                        elif (pad_attr != pcbnew.PAD_ATTRIB_SMD and 
+                              pad_attr != pcbnew.PAD_ATTRIB_PTH):
+                            continue  # Only SMD and PTH are valid
+                    
+                    # Get position (modern API returns VECTOR2I)
+                    pos = pad.GetPosition()
+                    tp_x = pcbnew.ToMM(pos.x)
+                    tp_y = pcbnew.ToMM(pos.y)
+                    
+                    # Round x and y, invert x if mirrored
+                    if not process_mirror:
+                        x = self.round_value(tp_x - self.origin[0])
+                    else:
+                        x = self.dims[0] - self.round_value(tp_x - self.origin[0])
+                    y = self.round_value(tp_y - self.origin[1])
+                    
+                    logger.info(f"  tp[{pad.GetNetname()}]@{layer_name} = ({x:.2f}, {y:.2f})")
+                    
+                    # Track minimum y coordinate
+                    if y < self.min_y:
+                        self.min_y = y
+                    
+                    # Save coordinates
+                    self.test_points.append((x, y))
+                    
+                    # Also save to layer-specific list (used by OpenSCAD)
+                    if process_layer == pcbnew.F_Cu:
+                        self.test_points_top.append((x, y))
+                    else:
+                        self.test_points_bottom.append((x, y))
+        
+        if self.both_sides:
+            logger.info(f"Found {len(self.test_points_top)} test points on F.Cu (top)")
+            logger.info(f"Found {len(self.test_points_bottom)} test points on B.Cu (bottom)")
+            logger.info(f"Total: {len(self.test_points)} test points")
+        else:
+            logger.info(f"Found {len(self.test_points)} test points total")
     
     def get_origin_dimensions(self):
         """
@@ -421,10 +524,12 @@ class GenFixture:
         logger.info(f"Board dimensions: {self.dims[0]:.2f} x {self.dims[1]:.2f} mm")
         logger.info(f"Board origin: ({self.origin[0]:.2f}, {self.origin[1]:.2f})")
     
-    def get_test_point_str(self) -> str:
+    def get_test_point_str(self, points: List[Tuple[float, float]] = None) -> str:
         """Format test points as OpenSCAD array string"""
+        if points is None:
+            points = self.test_points
         tps = "["
-        for tp in self.test_points:
+        for tp in points:
             tps += f"[{tp[0]:.02f},{tp[1]:.02f}],"
         return tps + "]"
     
@@ -445,13 +550,23 @@ class GenFixture:
         
         # Test for failure to find test points
         if len(self.test_points) == 0:
-            logger.error("No test points found!")
+            if self.both_sides:
+                logger.error("No test points found on either F.Cu or B.Cu!")
+            else:
+                layer_name = "F.Cu" if self.layer == pcbnew.F_Cu else "B.Cu"
+                logger.error(f"No test points found on {layer_name}!")
             logger.error("Verify that the pcbnew file has test points specified")
             logger.error("or use the --flayer option to force test points")
             return False
         
         # Plot DXF files
         self.plot_dxf(path, "outline")
+        outline_file = os.path.join(path, f"{self.prj_name}-outline.dxf")
+        if os.path.exists(outline_file):
+            logger.info(f"Exported DXF: outline ({os.path.getsize(outline_file)} bytes)")
+        else:
+            logger.error(f"Failed to export outline DXF to {outline_file}")
+        
         self.plot_dxf(path, "track")
         
         # Get revision
@@ -521,7 +636,6 @@ class GenFixture:
         
         # Common args
         args_dict = {
-            'test_points': self.get_test_point_str(),
             'tp_min_y': f"{self.min_y:.02f}",
             'mat_th': f"{self.config.mat_th:.02f}",
             'pcb_th': f"{self.config.pcb_th:.02f}",
@@ -531,11 +645,32 @@ class GenFixture:
             'screw_d': f"{self.config.screw_d:.02f}",
         }
         
+        # Always pass layer-specific arrays to OpenSCAD
+        # This allows proper visualization and fixture generation
+        args_dict['test_points_top'] = self.get_test_point_str(self.test_points_top)
+        args_dict['test_points_bottom'] = self.get_test_point_str(self.test_points_bottom)
+        
+        # Debug: Log the test point arrays being passed
+        logger.debug(f"Passing test_points_top array with {len(self.test_points_top)} points")
+        logger.debug(f"Passing test_points_bottom array with {len(self.test_points_bottom)} points")
+        if len(self.test_points_top) > 0:
+            logger.debug(f"First top point: {self.test_points_top[0]}, Last top point: {self.test_points_top[-1]}")
+        if len(self.test_points_bottom) > 0:
+            logger.debug(f"First bottom point: {self.test_points_bottom[0]}, Last bottom point: {self.test_points_bottom[-1]}")
+        
         # Path separators - store raw paths, quoting happens in command builder
         outline_path = os.path.join(path, f"{self.prj_name}-outline.dxf").replace("\\", "/")
-        track_path = os.path.join(path, f"{self.prj_name}-track.dxf").replace("\\", "/")
         args_dict['pcb_outline'] = outline_path
-        args_dict['pcb_track'] = track_path
+        
+        # Track paths - separate for both sides or single
+        if self.both_sides:
+            track_top_path = os.path.join(path, f"{self.prj_name}-track_top.dxf").replace("\\", "/")
+            track_bottom_path = os.path.join(path, f"{self.prj_name}-track_bottom.dxf").replace("\\", "/")
+            args_dict['pcb_track_top'] = track_top_path
+            args_dict['pcb_track_bottom'] = track_bottom_path
+        else:
+            track_path = os.path.join(path, f"{self.prj_name}-track.dxf").replace("\\", "/")
+            args_dict['pcb_track'] = track_path
         
         # Optional parameters - store raw values
         if self.config.rev:
@@ -554,6 +689,15 @@ class GenFixture:
             args_dict['pcb_support_border'] = f"{float(self.config.border):.02f}"
         if self.config.pogo_uncompressed_length:
             args_dict['pogo_uncompressed_length'] = f"{float(self.config.pogo_uncompressed_length):.02f}"
+        
+        # Log critical parameters for debugging
+        logger.debug(f"OpenSCAD parameters:")
+        logger.debug(f"  pcb_outline: {args_dict.get('pcb_outline', 'NOT SET')}")
+        logger.debug(f"  pcb_x: {args_dict.get('pcb_x', 'NOT SET')}")
+        logger.debug(f"  pcb_y: {args_dict.get('pcb_y', 'NOT SET')}")
+        logger.debug(f"  pcb_support_border: {args_dict.get('pcb_support_border', 'NOT SET')}")
+        logger.debug(f"  test_points_top count: {len(self.test_points_top)}")
+        logger.debug(f"  test_points_bottom count: {len(self.test_points_bottom)}")
         
         # Return args_dict for command builder to handle properly
         return args_dict
@@ -627,6 +771,7 @@ class GenFixture:
         cmd.extend(['-o', str(output), str(scad_file)])
         
         logger.info(f"Running OpenSCAD command with {len(args_dict)} parameters")
+        logger.debug(f"OpenSCAD command: {' '.join(cmd)}")
         
         try:
             # Use subprocess with list (no shell) to avoid quoting issues
@@ -680,7 +825,7 @@ def main():
     parser.add_argument('--screw_d', type=float,
                        help='Assembly screw diameter in mm')
     parser.add_argument('--layer',
-                       help='Test point layer: F.Cu or B.Cu')
+                       help='Test point layer: F.Cu, B.Cu, or both')
     parser.add_argument('--flayer',
                        help='Force layer: Eco1.User or Eco2.User')
     parser.add_argument('--ilayer',
@@ -703,16 +848,35 @@ def main():
                        help='Uncompressed pogo pin length in mm')
     parser.add_argument('--verbose', '-v', action='store_true',
                        help='Enable verbose logging')
+    parser.add_argument('--include-smd', action='store_true',
+                       help='Include SMD pads as test points (default: true)')
+    parser.add_argument('--include-pth', action='store_true',
+                       help='Include PTH (through-hole) pads as test points (default: true)')
     
     # Parse arguments
     args = parser.parse_args()
     
-    # Set logging level
-    if args.verbose:
-        logger.setLevel(logging.DEBUG)
-    
     # Convert output path to absolute
     out_dir = os.path.abspath(args.out)
+    
+    # Set logging level and add file handler if verbose
+    if args.verbose:
+        logger.setLevel(logging.DEBUG)
+        
+        # Create log file in output directory
+        os.makedirs(out_dir, exist_ok=True)
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+        log_file = os.path.join(out_dir, f'openfixture_{timestamp}.log')
+        
+        # Add file handler with same format as console
+        file_handler = logging.FileHandler(log_file, mode='w', encoding='utf-8')
+        file_handler.setLevel(logging.DEBUG)
+        formatter = logging.Formatter('%(asctime)s - %(levelname)s - %(message)s')
+        file_handler.setFormatter(formatter)
+        logger.addHandler(file_handler)
+        
+        logger.info(f"Verbose logging enabled - writing to: {log_file}")
     
     # Create output directory if needed
     if not os.path.exists(out_dir):
@@ -751,6 +915,20 @@ def main():
     if args.pogo_uncompressed_length:
         config.pogo_uncompressed_length = args.pogo_uncompressed_length
     
+    # Set pad type inclusion flags
+    # Logic: If either flag is present in command line, we're in explicit mode (from UI)
+    # and respect the flags exactly. If neither is present, default both to True (backward compat).
+    flags_explicitly_set = '--include-smd' in sys.argv or '--include-pth' in sys.argv
+    
+    if flags_explicitly_set:
+        # UI mode: respect flags exactly (present=True, absent=False)
+        config.include_smd = args.include_smd
+        config.include_pth = args.include_pth
+    else:
+        # Legacy mode: default both to True for backward compatibility
+        config.include_smd = True
+        config.include_pth = True
+    
     # Load board file
     try:
         logger.info(f"Loading board file: {args.board}")
@@ -766,8 +944,13 @@ def main():
     fixture = GenFixture(prj_name, brd, config)
     
     # Set layers
+    both_sides = False
     if args.layer:
-        layer = brd.GetLayerID(args.layer)
+        if args.layer.lower() == 'both':
+            both_sides = True
+            layer = -1  # Ignored when both_sides=True
+        else:
+            layer = brd.GetLayerID(args.layer)
     else:
         layer = -1
     
@@ -781,7 +964,7 @@ def main():
     else:
         ilayer = -1
     
-    fixture.set_layers(layer=layer, flayer=flayer, ilayer=ilayer)
+    fixture.set_layers(layer=layer, flayer=flayer, ilayer=ilayer, both=both_sides)
     
     # Generate fixture
     success = fixture.generate(out_dir)
