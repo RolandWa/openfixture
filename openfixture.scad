@@ -694,19 +694,26 @@ module carrier (dxf_filename, pcb_x, pcb_y, border)
     x = base_x;
     y = head_y;
     
-    // Border creates a ledge/support around the PCB
-    // Positive border = cutout SMALLER than PCB (creates ledge)
-    // Negative border = cutout LARGER than PCB (clearance)
+    // Calculate scale factors to create border/ledge effect
+    // Positive border = cutout SMALLER than PCB (creates support ledge)
+    // Negative border = cutout LARGER than PCB (component clearance)
     // Zero border = cutout matches PCB exactly
+    scale_x = 1 - ((2 * border) / pcb_x);
+    scale_y = 1 - ((2 * border) / pcb_y);
     
     difference () {
         square ([x, y]);
         
-        // Import dxf at full scale, offset by border amount
-        // Border shrinks the cutout by moving inward from edges
-        translate ([mat_th + active_x_offset + tp_correction_offset_x + border, 
-                   work_area_y + active_y_offset + tp_correction_offset_y - border])
+        // Get scale offset to center the scaled outline
+        sx_offset = (pcb_x - (pcb_x * scale_x)) / 2;
+        sy_offset = (pcb_y - (pcb_y * scale_y)) / 2;
+        
+        // Import dxf, scale to create border, and translate to position
+        translate ([mat_th + active_x_offset + tp_correction_offset_x, 
+                   work_area_y + active_y_offset + tp_correction_offset_y])
+        translate ([sx_offset, -sy_offset])
         hull () {
+            scale ([scale_x, scale_y, 1])
             import (dxf_filename);
         }
         
