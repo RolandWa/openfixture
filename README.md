@@ -106,22 +106,159 @@ python3 GenFixture.py \
 - M3 screws (14-20mm length)
 - M3 hex nuts
 - M3 washers (optional)
-- Pogo pins and receptacles
+- **Pogo pins and receptacles** - See **[POGO_PINS.md](POGO_PINS.md)** for complete specifications
 - Laser-cut material (acrylic or plywood, 2-5mm thick)
 
 ---
 
-## 🎯 Features
+## 🔌 Pogo Pin (Test Probe) Hardware
+
+**Spring-loaded test probes** (pogo pins) are the critical contact elements that make electrical connection to your PCB test points. OpenFixture supports standard pogo pin series from multiple manufacturers.
+
+### Quick Selection
+
+| Use Case | Recommended | Cost | Cycle Life |
+|----------|-------------|------|------------|
+| **Prototypes & Low Volume** | P75-E2 (24mm crown tip) | $0.30/point | 10k-50k cycles |
+| **Production & High Volume** | Fixtest 100 series | $3.50/point | 100k+ cycles |
+
+### Pogo Pin Series
+
+**[P75 Series](https://www.digole.com/index.php?categoryID=115)** (Budget-Friendly)
+- Price: $0.16-$0.22 per pin + ~$0.10 receptacle
+- Length options: 16.5-33.3mm (7 models: A2, B1, D2, D3, E2, F1, G2)
+- Cycle life: 10,000-50,000 cycles
+- Best for: Prototypes, low-volume testing, hobbyist projects
+
+**[Fixtest Series 100](https://www.tme.eu/pl/details/s100.00-l/igly-testowe/fixtest/s-100-00-l/)** (Professional Grade)
+- Price: ~$3.50 per test point (receptacle + probe)
+- Length: 29.6mm (S 100.00-L receptacle)
+- Cycle life: 100,000+ cycles
+- Best for: Production testing, automated equipment, high-volume
+
+### Configuration
+
+Set in `fixture_config.toml`:
+```toml
+[hardware]
+pogo_uncompressed_length_mm = 24.0  # For P75-E2 (recommended)
+# pogo_uncompressed_length_mm = 16.5  # For P75-A2/B1
+# pogo_uncompressed_length_mm = 29.6  # For Fixtest 100
+```
+
+### 📘 Complete Guide
+
+**See [POGO_PINS.md](POGO_PINS.md) for comprehensive documentation:**
+- Detailed specifications for all models
+- Tip style selection guide (sharp, round, flat, crown)
+- Installation and assembly instructions
+- Maintenance and replacement schedules
+- Cost analysis and ROI calculations
+- Supplier information and alternatives
+- Troubleshooting and FAQs
 
 ### Test Point Extraction
-- Automatic detection of SMD pads without paste mask
-- **PTH (through-hole) pad support**: Detects connector pins and component leads from opposite side
-  - Example: Connector on top → Test pins from bottom layer
-  - Only includes PTH pads from components on the opposite side (component body would block same-side access)
-- Force include/exclude layers support
-- **Single-sided testing**: Top side (F.Cu) OR bottom side (B.Cu)
-- Coordinate transformation and mirroring
-- Note: While the software can detect test points from both layers, the physical fixture design supports testing one side at a time
+
+OpenFixture automatically identifies test points on your PCB using intelligent pad detection. The software scans your KiCAD PCB file and selects pads based on specific criteria designed for reliable electrical testing.
+
+#### How Test Points Are Selected
+
+The test point selection algorithm evaluates each pad on the PCB using the following criteria (in order of precedence):
+
+**1. Force Layer (Highest Priority)**
+- Any pad on the **force layer** (default: `Eco2.User`) is **always included** as a test point
+- This overrides all other rules
+- Use this to manually designate specific pads as test points
+- Example: Draw on Eco2.User layer in KiCAD to force-include a pad
+
+**2. Ignore Layer**
+- Any pad on the **ignore layer** (default: `Eco1.User`) is **always excluded**
+- Use this to explicitly prevent specific pads from becoming test points
+- Example: Draw on Eco1.User layer to exclude a dense BGA area
+
+**3. Solder Paste Mask Check**
+- Pads with **solder paste mask** are excluded (they're designed for reflow soldering, not testing)
+- Only pads with **exposed copper** (no paste mask) are considered
+- Standard test points typically have paste mask removed in KiCAD footprint
+
+**4. Pad Type Filtering**
+- **SMD Pads** (`PAD_ATTRIB_SMD`):
+  - Surface mount pads (designed test points, IC pins, etc.)
+  - Included if `include_smd_pads = true` in config
+  - Same-side testing: Pogo pins contact pad directly from the test side
+  
+- **PTH Pads** (`PAD_ATTRIB_PTH`) - **Opposite Side Rule**:
+  - Through-hole pads (connectors, component leads, vias)
+  - Included if `include_pth_pads = true` in config
+  - **Critical**: Only PTH pads from components on the **opposite side** are used
+  - **Rationale**: Component body blocks access from the same side
+  - **Example**: 
+    - Testing from **bottom** (B.Cu) → Uses PTH pads from **top-side** components (F.Cu)
+    - Testing from **top** (F.Cu) → Uses PTH pads from **bottom-side** components (B.Cu)
+  - This allows testing through-hole connector pins from the back of the board
+
+**5. Layer Selection**
+- Only pads on the **selected layer** are included (F.Cu for top, B.Cu for bottom)
+- Single-sided testing: Choose either top OR bottom
+- Each test point must be on the active test layer
+
+#### Test Point Selection Matrix
+
+| Condition | SMD Pads | PTH Pads (Same Side*) | PTH Pads (Opposite Side*) |
+|-----------|----------|---------------------|------------------------|
+| **On Force Layer (Eco2.User)** | ✅ Always | ✅ Always | ✅ Always |
+| **On Ignore Layer (Eco1.User)** | ❌ Never | ❌ Never | ❌ Never |
+| **Has Paste Mask** | ❌ Excluded | ❌ Excluded | ❌ Excluded |
+| **No Paste Mask + include_smd=true** | ✅ Included | N/A | N/A |
+| **No Paste Mask + include_pth=true** | N/A | ❌ Excluded | ✅ Included |
+| **include_smd=false or include_pth=false** | ❌ Excluded | ❌ Excluded | ❌ Excluded |
+
+\* *Same Side* = Component on same layer as test points (e.g., test F.Cu, component on F.Cu)  
+\* *Opposite Side* = Component on opposite layer from test points (e.g., test B.Cu, component on F.Cu)
+
+#### Configuration Control
+
+Control test point selection in `fixture_config.toml`:
+
+```toml
+[board]
+test_layer = "F.Cu"  # "F.Cu" (top) or "B.Cu" (bottom)
+
+[test_points]
+include_smd_pads = true  # Include surface mount pads
+include_pth_pads = true  # Include through-hole pads (opposite side only)
+
+[layers]
+force_layer = "Eco2.User"   # Force include pads marked with this layer
+ignore_layer = "Eco1.User"  # Exclude pads marked with this layer
+```
+
+#### Practical Examples
+
+**Example 1: USB Connector Testing**
+- USB connector mounted on **top side** (F.Cu)
+- Component body on top prevents direct access to pins from top
+- Solution: Test from **bottom side** (B.Cu) using PTH pads
+- Through-hole pins are accessible from bottom while connector sits on top
+
+**Example 2: Test Points Only**
+- SMD test points added to **top side** (F.Cu)
+- No paste mask on test points
+- Solution: Test from **top side** (F.Cu) with include_smd=true
+- Pogo pins contact test pads directly
+
+**Example 3: Mixed Testing**
+- Test points on **top side** (F.Cu) - use SMD pads
+- Connector pins from top components - use PTH pads from **bottom side** (B.Cu)
+- Configure: `test_layer = "B.Cu"`, `include_smd_pads = true`, `include_pth_pads = true`
+
+#### Verification
+
+OpenFixture generates `track.dxf` overlay showing detected test points. Import this into KiCAD to verify:
+1. All required test points are detected
+2. No unwanted pads are included
+3. Alignment is correct
+4. Use force/ignore layers to adjust as needed
 
 ### Parametric Generation
 - OpenSCAD-based 3D model
@@ -276,6 +413,7 @@ python3 GenFixture.py \
 
 ## 📖 Documentation
 
+- **[POGO_PINS.md](POGO_PINS.md)** - Comprehensive pogo pin selection and specification guide
 - **[copilot-instructions_openfixture.md](copilot-instructions_openfixture.md)** - Complete technical documentation
 - **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Upgrade guide from legacy versions
 - **[fixture_config.toml](fixture_config.toml)** - Configuration file template
@@ -513,10 +651,19 @@ See: https://creativecommons.org/licenses/by-sa/4.0/
 - Use **test cut piece** to verify fit before full fixture
 
 ### Hardware
-- **M3 hardware** is the standard (readily available)
-- Measure nut dimensions with calipers (varies by manufacturer)
-- Use **2-part pogo pins** (replaceable pins when they break)
-- Force: 50-100g typical (too many high-force pins = hard to close)
+- **M3 hardware** is the standard (readily available worldwide)
+- Measure nut dimensions with calipers (varies by manufacturer: 5.4-5.5mm typical)
+- Use **nylon-insert lock nuts** for fixtures that will be opened/closed frequently
+- Washer selection: Stainless steel washers provide smooth hinge operation
+
+### Pogo Pins
+- **See [POGO_PINS.md](POGO_PINS.md) for complete specifications and selection guide**
+- **Budget builds**: P75 series ($0.30/point) - 10k-50k cycles, ideal for prototypes
+- **Production builds**: Fixtest 100 (~$3.50/point) - 100k+ cycles, for high-volume testing
+- **Compression**: Target 1.0-1.5mm (configured automatically by OpenFixture)
+- **Tip selection**: Crown (general), Sharp (fine pitch), Flat (high current), Rounded (PTH)
+- Use **two-part system** (receptacle + replaceable probe) for easy maintenance
+- Keep spare probes on hand - replace before reaching 75% of cycle life
 
 ### Workflow
 1. Design PCB in KiCAD with test pads
@@ -531,8 +678,9 @@ See: https://creativecommons.org/licenses/by-sa/4.0/
 
 ## 🆘 Getting Help
 
-1. Check **[copilot-instructions_openfixture.md](copilot-instructions_openfixture.md)** for detailed documentation
-2. Review **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** if upgrading from v1
+1. Check **[POGO_PINS.md](POGO_PINS.md)** for pogo pin selection, installation, and troubleshooting
+2. Check **[copilot-instructions_openfixture.md](copilot-instructions_openfixture.md)** for detailed documentation
+3. Review **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** if upgrading from v1
 3. Enable `--verbose` logging to diagnose issues
 4. Check original docs: http://tinylabs.io/openfixture
 5. Verify KiCAD version compatibility (v2 requires 8.0+)

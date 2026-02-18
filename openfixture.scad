@@ -37,8 +37,17 @@ tp_min_y = 13.7;
 // DXF outline of pcb
 pcb_outline = "./fixture/example_board-outline.dxf";
 //pcb_outline = "./rfid_fob-outline.dxf";
-osh_logo = "./osh_logo.dxf";
 pcb_track = "./fixture/example_board-track.dxf";
+
+// Logo configuration (configurable via TOML)
+logo_enable = 1;                  // 1 = show logo, 0 = hide logo
+logo_file = "./osh_logo.dxf";     // Path to logo DXF file
+logo_scale_x = 0.15;              // Logo X scale
+logo_scale_y = 0.15;              // Logo Y scale
+logo_scale_z = 1.0;               // Logo Z scale
+logo_offset_x = -72.0;            // Logo X offset (after scaling)
+logo_offset_y = -66.0;            // Logo Y offset (after scaling)
+logo_offset_z = 0.0;              // Logo Z offset (after scaling)
 
 // PCB revision
 rev = "rev.1";
@@ -399,10 +408,13 @@ module head_base ()
     }
 }
 
-module osh_logo () {
-    scale ([0.15, 0.15, 1])
-    translate ([-72, -66, 0])
-    import (osh_logo);
+module custom_logo () {
+    // Configurable logo module - scale and position are set via parameters
+    if (logo_enable == 1) {
+        scale ([logo_scale_x, logo_scale_y, logo_scale_z])
+        translate ([logo_offset_x, logo_offset_y, logo_offset_z])
+        import (logo_file);
+    }
 }
 
 module head_top ()
@@ -425,9 +437,9 @@ module head_top ()
         translate ([head_x - hole_offset, hole_offset])
         circle (r = screw_r + pad);
 
-        // Add osh logo
+        // Add custom logo (if enabled)
         translate ([head_x / 2, head_y - 30])
-        osh_logo ();
+        custom_logo ();
         
         // Remove cable relief holes
         translate ([mat_th * 3 + screw_d, head_y - (5 * mat_th) - screw_r, 0])
@@ -479,14 +491,14 @@ module head_base_common ()
         origin_y = active_x_offset + work_area_y;
     
         // Loop over test points - TOP
-        for ( i = [0 : len (test_points_top) - 1] ) {
+        for ( i = [0 : 1 : len (test_points_top) - 1] ) {
             // Drop pins for test points
             translate ([origin_x + test_points_top[i][0], origin_y - test_points_top[i][1]])
             circle (r = pogo_r);
         }
         
         // Loop over test points - BOTTOM
-        for ( i = [0 : len (test_points_bottom) - 1] ) {
+        for ( i = [0 : 1 : len (test_points_bottom) - 1] ) {
             // Drop pins for test points
             translate ([origin_x + test_points_bottom[i][0], origin_y - test_points_bottom[i][1]])
             circle (r = pogo_r);
@@ -694,43 +706,42 @@ module carrier (dxf_filename, pcb_x, pcb_y, border)
     x = base_x;
     y = head_y;
     
-    // Calculate scale factors to create border/ledge effect
-    // Positive border = cutout SMALLER than PCB (creates support ledge)
-    // Negative border = cutout LARGER than PCB (component clearance)
-    // Zero border = cutout matches PCB exactly
+    // Calculate scale factors
     scale_x = 1 - ((2 * border) / pcb_x);
     scale_y = 1 - ((2 * border) / pcb_y);
-    
+
     difference () {
-        square ([x, y]);
+        cube ([x, y, mat_th]);
         
-        // Get scale offset to center the scaled outline
+        // Get scale_offset
         sx_offset = (pcb_x - (pcb_x * scale_x)) / 2;
         sy_offset = (pcb_y - (pcb_y * scale_y)) / 2;
-        
-        // Import dxf, scale to create border, and translate to position
+
+        // Import dxf, extrude and translate
         translate ([mat_th + active_x_offset + tp_correction_offset_x, 
-                   work_area_y + active_y_offset + tp_correction_offset_y])
-        translate ([sx_offset, -sy_offset])
+                   work_area_y + active_y_offset + tp_correction_offset_y, 0])
+        translate ([sx_offset, -sy_offset, 0])
         hull () {
+            linear_extrude (height = mat_th)
             scale ([scale_x, scale_y, 1])
             import (dxf_filename);
         }
         
         // Remove slots
-        translate ([0, y/2])
+        translate ([0, y/2, 0])
         tng_n (y, 7);
-        translate ([x - mat_th, y/2])
+        translate ([x - mat_th, y/2, 0])
         tng_n (y, 7);
         
         // Remove holes
-        translate ([mat_th / 2, y / 2])
+        translate ([mat_th / 2, y / 2, 0])
         tnut_hole ();
-        translate ([x - mat_th / 2, y / 2])
+        translate ([x - mat_th / 2, y / 2, 0])
         tnut_hole ();
         
         // Add revision ID, also allows to determine which side is top
-        translate ([x / 2, y - 25])
+        translate ([x / 2, y - 25, 0])
+        linear_extrude (height = mat_th)
         text (rev, font = FONTNAME, halign = "center", valign = "center", size = 6);
     }
 }
@@ -845,14 +856,14 @@ module validate_testpoints (dxf_filename,dxf_track)
     import (dxf_track);
     
     // Loop over test points - TOP (red)
-    for ( i = [0 : len (test_points_top) - 1] ) {
+    for ( i = [0 : 1 : len (test_points_top) - 1] ) {
         color ([1, 0, 0])
         translate ([test_points_top[i][0], -test_points_top[i][1]])
         circle (r = pogo_r);
     }
     
     // Loop over test points - BOTTOM (blue)
-    for ( i = [0 : len (test_points_bottom) - 1] ) {
+    for ( i = [0 : 1 : len (test_points_bottom) - 1] ) {
         color ([0, 0, 1])
         translate ([test_points_bottom[i][0], -test_points_bottom[i][1]])
         circle (r = pogo_r);
@@ -861,10 +872,12 @@ module validate_testpoints (dxf_filename,dxf_track)
 
 module lasercut ()
 {
-    // Add carrier panels
+    // Add carrier panels (use projection to convert 3D to 2D for laser cutting)
+    projection(cut=true)
     carrier (pcb_outline, pcb_x, pcb_y, pcb_support_border);
     xoffset1 = base_x + laser_pad;
     translate ([xoffset1, 0])
+    projection(cut=true)
     carrier (pcb_outline, pcb_x, pcb_y, -0.05);
     
     // Add head top

@@ -76,6 +76,7 @@ $PluginFiles = @(
 $SupportFiles = @(
     "GenFixture.py",
     "openfixture.scad",
+    "glaser-stencil-d.ttf",
     "osh_logo.dxf",
     "fixture_config.toml",
     "genfixture.bat",
@@ -85,6 +86,7 @@ $SupportFiles = @(
 # Documentation files to sync to support subdirectory
 $DocumentationFiles = @(
     "README.md",
+    "POGO_PINS.md",
     "MIGRATION_GUIDE.md",
     "MODERNIZATION_SUMMARY.md",
     "SECURITY.md",

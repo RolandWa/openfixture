@@ -80,9 +80,28 @@ pivot_diameter_mm = 2.9
 border_mm = 0.8
 
 # Pogo pin specifications
-pogo_uncompressed_length_mm = 16.0
-# pogo_compression_mm = 1.0  # Target compression (handled in OpenSCAD)
-# pogo_diameter_mm = 1.5     # Receptacle diameter (handled in OpenSCAD)
+# Uncompressed length: Measured from receptacle base to pin tip (fully extended)
+# 
+# Common pogo pin series:
+# - P75-A2/B1: 16.5mm (budget-friendly, $0.16-0.22/pin, 10k-50k cycles)
+# - P75-E2: 24.0mm (crown tip, general purpose, good for 0402-0805 pads)
+# - Fixtest 100: 29.6mm (professional grade, ~$3.50/point, 100k+ cycles)
+#
+# Select based on your application:
+# - Prototype/low-volume: P75 series (16-24mm)
+# - Production/high-volume: Fixtest 100 (29.6mm)
+#
+pogo_uncompressed_length_mm = 16.0  # Default for P75-A2/B1
+
+# Examples for other pogo pin models:
+# pogo_uncompressed_length_mm = 24.0   # For P75-E2 (crown tip, 24mm)
+# pogo_uncompressed_length_mm = 29.6   # For Fixtest S 100.00-L receptacle
+# pogo_uncompressed_length_mm = 20.0   # For P75-D2 (flat tip, 20mm)
+
+# Advanced pogo pin parameters (handled automatically by OpenSCAD)
+# pogo_compression_mm = 1.0-1.5  # Target compression (optimal contact force)
+# pogo_diameter_mm = 1.02        # Pin barrel diameter (P75 series standard)
+# pogo_receptacle_diameter_mm = 1.5  # Receptacle hole diameter
 
 # ============================================================================
 # LAYER CONFIGURATION
@@ -95,6 +114,37 @@ force_layer = "Eco2.User"
 # Ignore layer - pads on this layer are never test points
 # Default: Eco1.User
 ignore_layer = "Eco1.User"
+
+# ============================================================================
+# BRANDING / LOGO
+# ============================================================================
+[logo]
+# Enable logo on fixture top plate
+enable = true
+
+# Logo file path (DXF format recommended for laser cutting)
+# Absolute path or relative to OpenFixture support directory
+# Default: "./osh_logo.dxf" (Open Source Hardware logo)
+file = "./osh_logo.dxf"
+
+# Logo scale factors (X, Y, Z)
+# Adjust to fit your logo size
+# Default OSH logo uses: 0.15, 0.15, 1.0
+scale_x = 0.15
+scale_y = 0.15
+scale_z = 1.0
+
+# Logo position offset (X, Y, Z)
+# Translation applied after scaling
+# Default OSH logo uses: -72, -66, 0 (centers the logo)
+offset_x = -72.0
+offset_y = -66.0
+offset_z = 0.0
+
+# Examples:
+# Company logo (larger): scale_x=0.25, scale_y=0.25, offset_x=-100, offset_y=-80
+# Project badge (small): scale_x=0.1, scale_y=0.1, offset_x=-50, offset_y=-50
+# Disable logo: enable = false
 
 # ============================================================================
 # OUTPUT SETTINGS
@@ -154,12 +204,51 @@ min_pogo_contact_angle = 89.5
 #   - Undersized holes can be carefully drilled out
 #
 # Pogo Pins:
-#   - Uncompressed length: From receptacle top to pin tip
-#   - Target compression: 1mm typical for good contact
-#   - Force: 50-100g recommended (too many high-force pins = hard to close)
+#   - Uncompressed length: From receptacle top to pin tip (fully extended)
+#   - Target compression: 1.0-1.5mm typical for good contact force
+#   - Spring force: 50-100g per pin recommended (too many = hard to close fixture)
+#   
+#   P75 Series (Budget-Friendly):
+#     • Barrel diameter: 1.02mm (0.040")
+#     • Length options: 16.5-33.3mm (A2/B1/D2/D3/E2/F1/G2 variants)
+#     • Price: $0.16-0.22 per pin
+#     • Cycle life: 10,000-50,000 cycles
+#     • Best for: Prototypes, low-volume testing
+#     • Tip styles:
+#       - P75-A2 (16.5mm, sharp point): Very small pads <0.5mm
+#       - P75-B1 (16.5mm, rounded): Through-hole connector pins
+#       - P75-E2 (24mm, crown): General purpose, 0402-0805 pads
+#       - P75-D2/D3 (20-22mm, flat): Large pads, high current >1A
+#     • Source: https://www.digole.com/index.php?categoryID=115
+#   
+#   Fixtest Series 100 (Professional Grade):
+#     • Receptacle length: 29.6mm (S 100.00-L)
+#     • Material: Beryllium copper, gold plated contacts
+#     • Price: ~$3.50 per test point (receptacle + probe)
+#     • Cycle life: 100,000+ cycles
+#     • Current rating: 3A continuous
+#     • Operating temp: -40°C to +125°C
+#     • Best for: Production testing, high-volume, automated test
+#     • Source: https://www.tme.eu/ (TME.eu - Fixtest series 100)
+#   
+#   Two-Part System:
+#     1. Receptacle (holder): Press-fit or solder into fixture plate
+#     2. Probe pin (plunger): Spring-loaded, replaceable wear component
+#     Keep spare probe pins - tips wear from repeated contact and arcing
 #
 # Test Points:
-#   - Default: SMD pads without paste mask
-#   - Force include: Add Eco2.User layer to pad
-#   - Ignore: Add Eco1.User layer to pad
-#   - Minimum size: 0.5mm diameter for reliable probing
+#   Selection algorithm (in order of precedence):
+#     1. Force layer (Eco2.User): ALWAYS included, overrides all rules
+#     2. Ignore layer (Eco1.User): ALWAYS excluded
+#     3. Paste mask: Pads with paste mask are excluded
+#     4. Pad type filtering (configurable):
+#        • SMD pads: Include if include_smd_pads=true
+#        • PTH pads: Include if include_pth_pads=true
+#          - PTH Opposite Side Rule: Only PTH from opposite side components
+#          - Example: Test from bottom → Only PTH from top components
+#          - Reason: Component body blocks same-side access
+#     5. Layer: Must be on selected test layer (F.Cu or B.Cu)
+#   
+#   Minimum pad size: 0.5mm diameter for reliable probing
+#   Verify with track.dxf overlay: Import into KiCAD to check alignment
+#   Design tip: Remove solder mask AND paste mask from test pads

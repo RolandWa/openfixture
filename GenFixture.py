@@ -69,6 +69,16 @@ class FixtureConfig:
         self.include_smd = True
         self.include_pth = True
         
+        # Logo parameters
+        self.logo_enable = True
+        self.logo_file = None
+        self.logo_scale_x = None
+        self.logo_scale_y = None
+        self.logo_scale_z = None
+        self.logo_offset_x = None
+        self.logo_offset_y = None
+        self.logo_offset_z = None
+        
     @classmethod
     def from_toml(cls, toml_path: str) -> 'FixtureConfig':
         """Load configuration from TOML file"""
@@ -110,6 +120,17 @@ class FixtureConfig:
             test_points_cfg = data.get('test_points', {})
             config.include_smd = test_points_cfg.get('include_smd_pads', True)
             config.include_pth = test_points_cfg.get('include_pth_pads', True)
+            
+            # Logo configuration
+            logo_cfg = data.get('logo', {})
+            config.logo_enable = logo_cfg.get('enable', True)
+            config.logo_file = logo_cfg.get('file')
+            config.logo_scale_x = logo_cfg.get('scale_x')
+            config.logo_scale_y = logo_cfg.get('scale_y')
+            config.logo_scale_z = logo_cfg.get('scale_z')
+            config.logo_offset_x = logo_cfg.get('offset_x')
+            config.logo_offset_y = logo_cfg.get('offset_y')
+            config.logo_offset_z = logo_cfg.get('offset_z')
             
             # Revision
             config.rev = board_cfg.get('revision') or data.get('revision')
@@ -544,10 +565,12 @@ class GenFixture:
         """Format test points as OpenSCAD array string"""
         if points is None:
             points = self.test_points
+        if len(points) == 0:
+            return "[]"
         tps = "["
         for tp in points:
             tps += f"[{tp[0]:.02f},{tp[1]:.02f}],"
-        return tps + "]"
+        return tps[:-1] + "]"
     
     def generate(self, path: str):
         """
@@ -706,6 +729,23 @@ class GenFixture:
         if self.config.pogo_uncompressed_length:
             args_dict['pogo_uncompressed_length'] = f"{float(self.config.pogo_uncompressed_length):.02f}"
         
+        # Logo parameters
+        args_dict['logo_enable'] = "1" if self.config.logo_enable else "0"
+        if self.config.logo_file:
+            args_dict['logo_file'] = self.config.logo_file
+        if self.config.logo_scale_x is not None:
+            args_dict['logo_scale_x'] = f"{float(self.config.logo_scale_x):.02f}"
+        if self.config.logo_scale_y is not None:
+            args_dict['logo_scale_y'] = f"{float(self.config.logo_scale_y):.02f}"
+        if self.config.logo_scale_z is not None:
+            args_dict['logo_scale_z'] = f"{float(self.config.logo_scale_z):.02f}"
+        if self.config.logo_offset_x is not None:
+            args_dict['logo_offset_x'] = f"{float(self.config.logo_offset_x):.02f}"
+        if self.config.logo_offset_y is not None:
+            args_dict['logo_offset_y'] = f"{float(self.config.logo_offset_y):.02f}"
+        if self.config.logo_offset_z is not None:
+            args_dict['logo_offset_z'] = f"{float(self.config.logo_offset_z):.02f}"
+        
         # Log critical parameters for debugging
         logger.debug(f"OpenSCAD parameters:")
         logger.debug(f"  pcb_outline: {args_dict.get('pcb_outline', 'NOT SET')}")
@@ -776,11 +816,22 @@ class GenFixture:
         
         # Add all other parameters
         for key, value in args_dict.items():
-            if isinstance(value, str) and ('/' in value or '\\' in value or ' ' in value):
-                # Path-like string - add quotes
-                cmd.extend(['-D', f'{key}="{value}"'])
+            if isinstance(value, str):
+                # Check if it's an array literal (starts with '[')
+                if value.strip().startswith('['):
+                    # Array - no quotes
+                    cmd.extend(['-D', f'{key}={value}'])
+                else:
+                    # Check if it's a numeric string (e.g., "3.00", "12.31")
+                    try:
+                        float(value)
+                        # Numeric string - no quotes (OpenSCAD needs bare numbers)
+                        cmd.extend(['-D', f'{key}={value}'])
+                    except ValueError:
+                        # Non-numeric string - add quotes
+                        cmd.extend(['-D', f'{key}="{value}"'])
             else:
-                # Numeric or already formatted - no quotes
+                # Numeric value - no quotes
                 cmd.extend(['-D', f'{key}={value}'])
         
         # Add output and input files
