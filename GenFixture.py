@@ -183,6 +183,9 @@ class GenFixture:
         self.test_points_top: List[Tuple[float, float]] = []
         self.test_points_bottom: List[Tuple[float, float]] = []
         
+        # Track if auxiliary origin was successfully set (KiCAD 9 compatibility)
+        self.origin_forced: bool = False
+        
         # Actual board dimensions from Edge.Cuts (for validation)
         self.board_width_mm = 0.0
         self.board_height_mm = 0.0
@@ -231,36 +234,18 @@ class GenFixture:
         """Round value to specified precision"""
         return round(base * round(x / base), 2)
     
-    def force_origin_to_zero(self):
+    def force_origin_to_zero(self) -> bool:
         """
-        Force the board origin to (0,0) by setting auxiliary origin.
-        This ensures all exports (DXF, test points) are normalized to (0,0).
+        Note: This function is kept for API compatibility but does nothing.
+        We always use absolute KiCAD drill origin coordinates.
         
-        The calculated board origin (top-left corner) is set as the auxiliary origin,
-        which makes KiCAD export everything relative to that point.
+        Returns:
+            bool: Always returns False (absolute coordinates)
         """
-        logger.info(f"Forcing origin to (0,0) - Board top-left is at KiCAD ({self.origin[0]:.2f}, {self.origin[1]:.2f})")
-        
-        # Save auxiliary origin (KiCAD 8 compatibility)
-        has_aux_origin = hasattr(self.brd, 'GetAuxOrigin')
-        
-        if has_aux_origin:
-            try:
-                # Set auxiliary origin to board's top-left corner
-                # This makes all subsequent exports use (0,0) as the reference
-                origin_point = pcbnew.VECTOR2I(
-                    pcbnew.FromMM(self.origin[0]),
-                    pcbnew.FromMM(self.origin[1])
-                )
-                self.brd.SetAuxOrigin(origin_point)
-                logger.info("✓ Auxiliary origin set - All exports will use (0,0) reference")
-                return origin_point
-            except AttributeError:
-                logger.warning("SetAuxOrigin not available (KiCAD 9) - using plot origin mode")
-                return None
-        else:
-            logger.info("Auxiliary origin not available (KiCAD 9) - using drill/place origin mode")
-            return None
+        logger.info(f"Using absolute drill origin - Board top-left at KiCAD ({self.origin[0]:.2f}, {self.origin[1]:.2f})")
+        logger.info("✓ All exports use KiCAD absolute (drill origin) coordinates")
+        self.origin_forced = False
+        return False
     
     def plot_dxf(self, path: str, layer_to_check: str):
         """
@@ -530,12 +515,9 @@ class GenFixture:
                     tp_x = pcbnew.ToMM(pos.x)
                     tp_y = pcbnew.ToMM(pos.y)
                     
-                    # Round x and y, invert x if mirrored
-                    if not process_mirror:
-                        x = self.round_value(tp_x - self.origin[0])
-                    else:
-                        x = self.dims[0] - self.round_value(tp_x - self.origin[0])
-                    y = self.round_value(tp_y - self.origin[1])
+                    # Always use absolute KiCAD drill origin coordinates (no offset needed)
+                    x = self.round_value(tp_x)
+                    y = self.round_value(tp_y)
                     
                     logger.info(f"  tp[{pad.GetNetname()}]@{layer_name} = ({x:.2f}, {y:.2f})")
                     
@@ -731,16 +713,11 @@ class GenFixture:
             errors.append("Could not validate dimensions - Edge.Cuts layer not found or empty")
         
         # Check 2: Origin validation
-        # Note: self.origin contains the KiCAD coordinates of the board's top-left corner
-        # We set this as auxiliary origin, which makes the EXPORTED DXF start at (0,0)
-        # If the board is far from KiCAD origin, just log it as info (not a warning)
-        if abs(self.origin[0]) > origin_threshold_mm or abs(self.origin[1]) > origin_threshold_mm:
-            logger.info(
-                f"Board position in KiCAD: ({self.origin[0]:.2f}, {self.origin[1]:.2f}). "
-                f"Auxiliary origin set - DXF exports at (0,0) ✓"
-            )
-        else:
-            logger.info(f"Board already at KiCAD origin: ({self.origin[0]:.2f}, {self.origin[1]:.2f}) ✓")
+        # Note: Always using absolute KiCAD drill origin coordinates
+        logger.info(
+            f"Board position in KiCAD: ({self.origin[0]:.2f}, {self.origin[1]:.2f}). "
+            f"Using absolute drill origin coordinates ✓"
+        )
         
         # Check 3: Minimum dimension sanity check
         min_board_size = 10.0  # mm
@@ -780,7 +757,7 @@ class GenFixture:
         if not errors and not warnings:
             logger.info("✓ DXF export validation passed")
             logger.info(f"  Board: {self.dims[0]:.2f} x {self.dims[1]:.2f} mm")
-            logger.info(f"  Export origin: (0.00, 0.00) - Forced via auxiliary origin")
+            logger.info(f"  Export origin: ({self.origin[0]:.2f}, {self.origin[1]:.2f}) - Absolute drill origin")
             logger.info(f"  Test points: {len(self.test_points)} total ({len(self.test_points_top)} top, {len(self.test_points_bottom)} bottom)")
     
     def get_test_point_str(self, points: List[Tuple[float, float]] = None) -> str:
@@ -903,8 +880,10 @@ class GenFixture:
         pcb_x = self.board_width_mm if self.board_width_mm > 0 else self.dims[0]
         pcb_y = self.board_height_mm if self.board_height_mm > 0 else self.dims[1]
         
+        # Note: tp_min_y is hardcoded in openfixture.scad (not exported from GenFixture.py)
         args_dict = {
-            'tp_min_y': f"{self.min_y:.02f}",
+            'board_origin_x': f"{self.origin[0]:.02f}",
+            'board_origin_y': f"{self.origin[1]:.02f}",
             'mat_th': f"{self.config.mat_th:.02f}",
             'pcb_th': f"{self.config.pcb_th:.02f}",
             'pcb_x': f"{pcb_x:.02f}",

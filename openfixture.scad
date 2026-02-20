@@ -23,11 +23,14 @@ FONTNAME = "Glaser Stencil D";
 //
 // Test points - separate arrays for top and bottom layers
 // For single-sided testing, one array will be empty []
-//test_points_top=[[97.89,23.67],[95.35,23.67],[92.81,23.67],[90.27,23.67],[87.73,23.67],[85.19,23.67],[82.65,23.67],[80.11,23.67],[77.57,23.67],[75.03,23.67],[72.49,23.67],[69.95,23.67],[67.41,23.67],[64.87,23.67],[62.33,23.67],[59.79,23.67],[57.25,23.67],[54.71,23.67],[52.17,23.67],[49.63,23.67],[49.63,43.05],[52.17,43.05],[54.71,43.05],[57.25,43.05],[59.79,43.05],[62.33,43.05],[64.87,43.05],[67.41,43.05],[69.95,43.05],[72.49,43.05],[75.03,43.05],[77.57,43.05],[80.11,43.05],[82.65,43.05],[85.19,43.05],[87.73,43.05],[90.27,43.05],[92.81,43.05],[95.35,43.05],[97.89,43.05],[49.86,30.82],[49.86,33.36],[49.86,35.90],[89.44,48.60],[89.09,15.61],[80.33,15.61],[14.37,11.77],[40.70,53.92],[49.46,53.92],[53.31,53.92],[62.07,53.92],[81.73,54.80],[84.23,54.80]];
-//test_points_bottom=[[77.95,56.05],[77.95,54.05],[75.95,56.05],[75.95,54.05],[73.95,56.05],[73.95,54.05],[68.43,56.95],[60.11,12.31],[57.57,12.31],[55.03,12.31],[11.19,49.24],[11.19,47.96],[11.67,48.60],[12.16,49.24],[12.16,47.96],[60.57,45.12],[60.57,47.66],[60.57,50.20],[12.02,15.61],[20.78,15.61],[12.02,16.06],[20.78,16.06],[68.85,23.23],[68.85,25.77],[68.43,12.50],[32.38,56.95],[87.15,56.05],[87.15,54.05],[85.15,56.05],[85.15,54.05],[83.15,56.05],[83.15,54.05],[60.41,53.92],[51.65,53.92],[60.41,53.47],[51.65,53.47],[47.62,12.31],[45.08,12.31],[42.54,12.31],[40.00,12.31],[96.69,21.53],[96.69,25.03],[96.69,28.53],[96.69,32.03],[96.69,35.53],[96.69,39.03],[96.69,42.53],[96.69,46.03],[47.80,53.92],[39.04,53.92],[47.80,53.47],[39.04,53.47],[32.38,12.50],[41.95,30.47],[41.31,30.47]];
+// CSI Current Measurement Board - 53 test points (ABSOLUTE KiCAD 9 COORDINATES)
+// These coordinates match the DXF files exported from KiCAD 9
+test_points_top=[[184.40,83.27],[181.86,83.27],[179.32,83.27],[176.78,83.27],[174.24,83.27],[171.70,83.27],[169.16,83.27],[166.62,83.27],[164.08,83.27],[161.54,83.27],[159.00,83.27],[156.46,83.27],[153.92,83.27],[151.38,83.27],[148.84,83.27],[146.30,83.27],[143.76,83.27],[141.22,83.27],[138.68,83.27],[136.14,83.27],[136.14,102.65],[138.68,102.65],[141.22,102.65],[143.76,102.65],[146.30,102.65],[148.84,102.65],[151.38,102.65],[153.92,102.65],[156.46,102.65],[159.00,102.65],[161.54,102.65],[164.08,102.65],[166.62,102.65],[169.16,102.65],[171.70,102.65],[174.24,102.65],[176.78,102.65],[179.32,102.65],[181.86,102.65],[184.40,102.65],[136.37,90.42],[136.37,92.96],[136.37,95.50],[175.95,108.20],[175.60,75.21],[166.84,75.21],[100.88,71.37],[127.22,113.52],[135.98,113.52],[139.82,113.52],[148.58,113.52],[168.24,114.40],[170.74,114.40]];
+test_points_bottom=[[109.68,115.65],[109.68,113.65],[111.68,115.65],[111.68,113.65],[113.68,115.65],[113.68,113.65],[119.19,116.55],[127.51,71.91],[130.05,71.91],[132.59,71.91],[176.43,108.84],[176.43,107.56],[175.95,108.20],[175.46,108.84],[175.46,107.56],[127.05,104.72],[127.05,107.26],[127.05,109.80],[175.60,75.21],[166.84,75.21],[175.60,75.66],[166.84,75.66],[118.77,82.83],[118.77,85.37],[119.19,72.10],[155.24,116.55],[100.48,115.65],[100.48,113.65],[102.48,115.65],[102.48,113.65],[104.48,115.65],[104.48,113.65],[127.22,113.52],[135.98,113.52],[127.22,113.06],[135.98,113.06],[140.00,71.91],[142.54,71.91],[145.08,71.91],[147.62,71.91],[90.93,81.13],[90.93,84.63],[90.93,88.13],[90.93,91.63],[90.93,95.13],[90.93,98.63],[90.93,102.13],[90.93,105.63],[139.82,113.52],[148.58,113.52],[139.82,113.06],[148.58,113.06],[155.24,72.10],[145.67,90.07],[146.31,90.07]];
 
-test_points_top = [[23.22,25.85],[19.72,22.28],[3.95,25.77],[7.52,22.27],[13.60,13.70],[13.55,18.70],[13.55,34.90],[13.60,29.90]];
-test_points_bottom=[];
+// RFID Fob Board - 8 test points (commented out)
+//test_points_top = [[23.22,25.85],[19.72,22.28],[3.95,25.77],[7.52,22.27],[13.60,13.70],[13.55,18.70],[13.55,34.90],[13.60,29.90]];
+//test_points_bottom=[];
 
 
 // Legacy: combined test points (computed from top+bottom)
@@ -38,9 +41,14 @@ test_points = concat(test_points_top, test_points_bottom);
 // All you have to know is look through 'y' column above and set to lowest val
 tp_min_y = 13.7;
 
+// Board origin in KiCAD absolute coordinates (top-left corner)
+// These values are set by GenFixture.py and represent where (0,0) of the board is in KiCAD space
+board_origin_x = 86.51;  // KiCAD X coordinate of board top-left (passed from GenFixture.py)
+board_origin_y = 68.50;  // KiCAD Y coordinate of board top-left (passed from GenFixture.py)
+
 // DXF outline of pcb
-//pcb_outline = "./CSI_current_measurment-outline.dxf";
-pcb_outline = "./rfid_fob-outline.dxf";
+pcb_outline = "./CSI_current_measurment-outline.dxf";
+//pcb_outline = "./rfid_fob-outline.dxf";
 //pcb_outline = "./CSI_current_measurment-Edge_Cuts.dxf";
 pcb_track = "./CSI_current_measurment-track.dxf";
 
@@ -70,9 +78,10 @@ rev = "rev.1";
 // with actual board dimensions detected from KiCAD Edge.Cuts layer.
 // These are fallback defaults for manual OpenSCAD editing.
 //
-// Current board: RFID Fob
-pcb_x = 27.14;  // Board width (mm) - Auto-detected from Edge.Cuts
-pcb_y = 44.95;  // Board height (mm) - Auto-detected from Edge.Cuts
+// Current board: CSI Current Measurement
+pcb_x = 100;  // Board width (mm) - Auto-detected from Edge.Cuts
+//pcb_y = 51.72;  // Board height (mm) - Auto-detected from Edge.Cuts
+pcb_y = 51.72; 
 pcb_support_border = 0;  // Set to 0 to use exact DXF size (no scaling)
 
 
@@ -103,8 +112,8 @@ tp_correction_offset_y = 0.0;
 // make sure everything lines up.
 //projection (cut = false) alignment_check ();
 //mode = "3dmodel";
-mode = "lasercut";
-//mode = "validate";
+//mode = "lasercut";
+mode = "validate";
 //mode = "testcut";
 //mode = "none";
 
@@ -503,21 +512,25 @@ module head_base_common ()
         rotate ([0, 0, 90])
         tng_p (head_x + mat_th, 3);
         
-        // Calc (x,y) origin = (0, 0)
+        // FIXTURE-RELATIVE COORDINATE MODE
+        // Convert absolute KiCAD coordinates to fixture-relative coordinates
+        // Fixture offset puts board origin at (active_x_offset, active_y_offset + work_area_y)
         origin_x = active_x_offset;
         origin_y = active_y_offset + work_area_y;
     
         // Loop over test points - TOP
         for ( i = [0 : 1 : len (test_points_top) - 1] ) {
-            // Drop pins for test points
-            translate ([origin_x + test_points_top[i][0], origin_y - test_points_top[i][1]])
+            // Convert: absolute KiCAD coords → board-relative → fixture-relative
+            translate ([origin_x + (test_points_top[i][0] - board_origin_x), 
+                       origin_y - (test_points_top[i][1] - board_origin_y)])
             circle (r = pogo_r);
         }
         
         // Loop over test points - BOTTOM
         for ( i = [0 : 1 : len (test_points_bottom) - 1] ) {
-            // Drop pins for test points
-            translate ([origin_x + test_points_bottom[i][0], origin_y - test_points_bottom[i][1]])
+            // Convert: absolute KiCAD coords → board-relative → fixture-relative
+            translate ([origin_x + (test_points_bottom[i][0] - board_origin_x), 
+                       origin_y - (test_points_bottom[i][1] - board_origin_y)])
             circle (r = pogo_r);
         }
     }
@@ -734,14 +747,16 @@ module carrier (dxf_filename, pcb_x, pcb_y, border)
         sx_offset = (pcb_x - (pcb_x * scale_x)) / 2;
         sy_offset = (pcb_y - (pcb_y * scale_y)) / 2;
 
-        // Import dxf, extrude and translate
-        translate ([active_x_offset + tp_correction_offset_x, 
-                   active_y_offset + work_area_y + tp_correction_offset_y, 0])
+        // FIXTURE-RELATIVE COORDINATE MODE
+        // Convert absolute KiCAD DXF coordinates to fixture-relative
+        // DXF is at absolute coords, mirror flips Y, then position in fixture frame
+        translate ([active_x_offset + tp_correction_offset_x - board_origin_x, 
+                   active_y_offset + work_area_y + tp_correction_offset_y + board_origin_y, 0])
         translate ([sx_offset, -sy_offset, 0])
         hull () {
             linear_extrude (height = mat_th)
             scale ([scale_x * dxf_scale, scale_y * dxf_scale, 1])
-            mirror ([0, 1])
+           // mirror ([0, 1])
             import (dxf_filename);
         }
         
@@ -871,48 +886,34 @@ module 3d_model () {
 
 module validate_testpoints (dxf_filename, dxf_track, pcb_x, pcb_y, border)
 {
-    // Apply same positioning and scaling as carrier module for consistent view
-    offset_x = active_x_offset + tp_correction_offset_x;
-    offset_y = active_y_offset + work_area_y + tp_correction_offset_y;
+    // ABSOLUTE COORDINATE MODE (KiCAD 9 drill origin)
+    // DXF files and test points use absolute KiCAD drill origin coordinates
+    // Direct overlay without any fixture offsets
     
-    // Calculate scale factors (same as carrier module)
-    scale_x = 1 - ((2 * border) / pcb_x);
-    scale_y = 1 - ((2 * border) / pcb_y);
+    // PCB outline in magenta with transparency
+    hull () {
+        color ([1, 0, 1, 0.5])
+        scale ([dxf_scale, dxf_scale])
+        import (dxf_filename);
+    }
     
-    // Get scale_offset (same as carrier module)
-    sx_offset = (pcb_x - (pcb_x * scale_x)) / 2;
-    sy_offset = (pcb_y - (pcb_y * scale_y)) / 2;
+    // PCB tracks in green
+    color ([0, 1, 0])
+    scale ([dxf_scale, dxf_scale])
+    import (dxf_track);
     
-    translate ([offset_x, offset_y]) {
-        translate ([sx_offset, -sy_offset]) {
-            // PCB outline in magenta with transparency
-            color ([1, 0, 1, 0.5])
-            //hull () {
-               scale ([scale_x * dxf_scale, scale_y * dxf_scale])
-               mirror ([0, 1])
-               import (dxf_filename);
-           // }
-            
-            // PCB tracks in green
-            color ([0, 1, 0])
-            scale ([scale_x * dxf_scale, scale_y * dxf_scale])
-            mirror ([0, 1])
-            import (dxf_track);
-        }
-        
-        // Loop over test points - TOP (red) - positioned in work area coordinate system
-        for ( i = [0 : 1 : len (test_points_top) - 1] ) {
-            color ([1, 0, 0])
-            translate ([test_points_top[i][0] + sx_offset, -test_points_top[i][1] - sy_offset])
-            circle (r = pogo_r);
-        }
-
-        // Loop over test points - BOTTOM (blue) - positioned in work area coordinate system
-        for ( i = [0 : 1 : len (test_points_bottom) - 1] ) {
-            color ([0, 0, 1])
-            translate ([test_points_bottom[i][0] + sx_offset, -test_points_bottom[i][1] - sy_offset])
-            circle (r = pogo_r);
-        }
+    // Test points - TOP (red) - at absolute drill origin coordinates
+    for ( i = [0 : 1 : len (test_points_top) - 1] ) {
+        color ([1, 0, 0])
+        translate ([test_points_top[i][0], -test_points_top[i][1], 0])
+        circle (r = pogo_r);
+    }
+    
+    // Test points - BOTTOM (blue) - at absolute drill origin coordinates
+    for ( i = [0 : 1 : len (test_points_bottom) - 1] ) {
+        color ([0, 0, 1])
+        translate ([test_points_bottom[i][0], -test_points_bottom[i][1], 0])
+        circle (r = pogo_r);
     }
 }
 
