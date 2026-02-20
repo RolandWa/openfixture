@@ -1,0 +1,154 @@
+#!/usr/bin/env python3
+"""
+Analyze DXF files to find coordinate ranges and geometry characteristics
+
+USAGE:
+    1. Copy this file to analyze_dxf.py
+    2. Edit the 'files' list at the bottom with your DXF file paths
+    3. Run: python analyze_dxf.py
+"""
+
+import sys
+import os
+import re
+
+def analyze_dxf(filename):
+    """Parse DXF file and extract coordinate statistics"""
+    print(f"\n{'='*70}")
+    print(f"Analyzing: {os.path.basename(filename)}")
+    print(f"{'='*70}\n")
+    
+    if not os.path.exists(filename):
+        print(f"ERROR: File not found: {filename}")
+        return
+    
+    x_coords = []
+    y_coords = []
+    
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+    
+    # Parse DXF format
+    i = 0
+    while i < len(lines):
+        line = lines[i].strip()
+        
+        # Group code 10 = X coordinate of start point
+        if line == '10':
+            i += 1
+            try:
+                x = float(lines[i].strip())
+                x_coords.append(x)
+            except ValueError:
+                pass
+        
+        # Group code 20 = Y coordinate of start point
+        elif line == '20':
+            i += 1
+            try:
+                y = float(lines[i].strip())
+                y_coords.append(y)
+            except ValueError:
+                pass
+        
+        # Group code 11 = X coordinate of end point
+        elif line == '11':
+            i += 1
+            try:
+                x = float(lines[i].strip())
+                x_coords.append(x)
+            except ValueError:
+                pass
+        
+        # Group code 21 = Y coordinate of end point
+        elif line == '21':
+            i += 1
+            try:
+                y = float(lines[i].strip())
+                y_coords.append(y)
+            except ValueError:
+                pass
+        
+        i += 1
+    
+    if not x_coords or not y_coords:
+        print("No coordinates found in file!")
+        return
+    
+    # Calculate statistics
+    min_x, max_x = min(x_coords), max(x_coords)
+    min_y, max_y = min(y_coords), max(y_coords)
+    width = max_x - min_x
+    height = max_y - min_y
+    
+    print(f"Total coordinate points: {len(x_coords)} X, {len(y_coords)} Y")
+    print(f"\nX-axis range:")
+    print(f"  Min: {min_x:.4f} mm")
+    print(f"  Max: {max_x:.4f} mm")
+    print(f"  Width: {width:.4f} mm")
+    
+    print(f"\nY-axis range:")
+    print(f"  Min: {min_y:.4f} mm")
+    print(f"  Max: {max_y:.4f} mm")
+    print(f"  Height: {height:.4f} mm")
+    
+    print(f"\nBounding box: {width:.2f} mm × {height:.2f} mm")
+    print(f"Origin offset: ({min_x:.2f}, {min_y:.2f})")
+    
+    # Check coordinate system
+    if min_y < 0 and max_y <= 0:
+        print(f"\n⚠️  WARNING: All Y coordinates are NEGATIVE!")
+        print(f"   This suggests Y-axis inversion in coordinate system")
+    elif min_y < 0:
+        print(f"\n⚠️  WARNING: Y coordinates span negative values!")
+        print(f"   Range: {min_y:.2f} to {max_y:.2f}")
+    
+    if min_x < 0 and max_x <= 0:
+        print(f"\n⚠️  WARNING: All X coordinates are NEGATIVE!")
+    
+    # Check if geometry starts at origin
+    if abs(min_x) > 1.0 or abs(min_y) > 1.0:
+        print(f"\n⚠️  Geometry does NOT start at origin (0,0)")
+        print(f"   Offset required: [{-min_x:.2f}, {-min_y:.2f}] mm")
+    else:
+        print(f"\n✓ Geometry starts near origin")
+    
+    return {
+        'min_x': min_x,
+        'max_x': max_x,
+        'min_y': min_y,
+        'max_y': max_y,
+        'width': width,
+        'height': height
+    }
+
+if __name__ == "__main__":
+    # CONFIGURATION: Edit these paths to point to your DXF files
+    # Example paths - replace with your actual file locations
+    files = [
+        "./fixture-rev_01/example_board-fixture.dxf",
+        "./fixture-rev_01/example_board-outline.dxf",
+        "./fixture-rev_01/example_board-track.dxf",
+        "./fixture-rev_01/example_board-test.dxf",
+    ]
+    
+    # Alternative: Analyze files passed as command-line arguments
+    if len(sys.argv) > 1:
+        files = sys.argv[1:]
+    
+    results = {}
+    for filename in files:
+        if os.path.exists(filename):
+            results[os.path.basename(filename)] = analyze_dxf(filename)
+        else:
+            print(f"\nSkipping {os.path.basename(filename)} - file not found")
+    
+    print(f"\n{'='*70}")
+    print("SUMMARY")
+    print(f"{'='*70}\n")
+    
+    for name, data in results.items():
+        if data:
+            print(f"{name:40s} {data['width']:7.2f} x {data['height']:7.2f} mm")
+            print(f"{'':40s} Origin: ({data['min_x']:7.2f}, {data['min_y']:7.2f})")
+            print()

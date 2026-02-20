@@ -23,8 +23,12 @@ FONTNAME = "Glaser Stencil D";
 //
 // Test points - separate arrays for top and bottom layers
 // For single-sided testing, one array will be empty []
-test_points_top=[[17.95,5.83],[35.47,27.73],[44.63,1.65],[34.75,12.72],[20.14,20.57],[20.06,17.51],[21.12,13.88],[18.96,23.13],];
+//test_points_top=[[97.89,23.67],[95.35,23.67],[92.81,23.67],[90.27,23.67],[87.73,23.67],[85.19,23.67],[82.65,23.67],[80.11,23.67],[77.57,23.67],[75.03,23.67],[72.49,23.67],[69.95,23.67],[67.41,23.67],[64.87,23.67],[62.33,23.67],[59.79,23.67],[57.25,23.67],[54.71,23.67],[52.17,23.67],[49.63,23.67],[49.63,43.05],[52.17,43.05],[54.71,43.05],[57.25,43.05],[59.79,43.05],[62.33,43.05],[64.87,43.05],[67.41,43.05],[69.95,43.05],[72.49,43.05],[75.03,43.05],[77.57,43.05],[80.11,43.05],[82.65,43.05],[85.19,43.05],[87.73,43.05],[90.27,43.05],[92.81,43.05],[95.35,43.05],[97.89,43.05],[49.86,30.82],[49.86,33.36],[49.86,35.90],[89.44,48.60],[89.09,15.61],[80.33,15.61],[14.37,11.77],[40.70,53.92],[49.46,53.92],[53.31,53.92],[62.07,53.92],[81.73,54.80],[84.23,54.80]];
+//test_points_bottom=[[77.95,56.05],[77.95,54.05],[75.95,56.05],[75.95,54.05],[73.95,56.05],[73.95,54.05],[68.43,56.95],[60.11,12.31],[57.57,12.31],[55.03,12.31],[11.19,49.24],[11.19,47.96],[11.67,48.60],[12.16,49.24],[12.16,47.96],[60.57,45.12],[60.57,47.66],[60.57,50.20],[12.02,15.61],[20.78,15.61],[12.02,16.06],[20.78,16.06],[68.85,23.23],[68.85,25.77],[68.43,12.50],[32.38,56.95],[87.15,56.05],[87.15,54.05],[85.15,56.05],[85.15,54.05],[83.15,56.05],[83.15,54.05],[60.41,53.92],[51.65,53.92],[60.41,53.47],[51.65,53.47],[47.62,12.31],[45.08,12.31],[42.54,12.31],[40.00,12.31],[96.69,21.53],[96.69,25.03],[96.69,28.53],[96.69,32.03],[96.69,35.53],[96.69,39.03],[96.69,42.53],[96.69,46.03],[47.80,53.92],[39.04,53.92],[47.80,53.47],[39.04,53.47],[32.38,12.50],[41.95,30.47],[41.31,30.47]];
+
+test_points_top = [[23.22,25.85],[19.72,22.28],[3.95,25.77],[7.52,22.27],[13.60,13.70],[13.55,18.70],[13.55,34.90],[13.60,29.90]];
 test_points_bottom=[];
+
 
 // Legacy: combined test points (computed from top+bottom)
 test_points = concat(test_points_top, test_points_bottom);
@@ -35,9 +39,18 @@ test_points = concat(test_points_top, test_points_bottom);
 tp_min_y = 13.7;
 
 // DXF outline of pcb
-pcb_outline = "./fixture/example_board-outline.dxf";
-//pcb_outline = "./rfid_fob-outline.dxf";
-pcb_track = "./fixture/example_board-track.dxf";
+//pcb_outline = "./CSI_current_measurment-outline.dxf";
+pcb_outline = "./rfid_fob-outline.dxf";
+//pcb_outline = "./CSI_current_measurment-Edge_Cuts.dxf";
+pcb_track = "./CSI_current_measurment-track.dxf";
+
+// DXF scale correction factor
+// If DXF is exported at wrong scale, adjust here
+// Example: if DXF is 1:1000 scale, use 1000
+// Set to 1 for no scaling
+//dxf_scale = 25.5;  // inch scale
+dxf_scale = 1;
+
 
 // Logo configuration (configurable via TOML)
 logo_enable = 1;                  // 1 = show logo, 0 = hide logo
@@ -52,10 +65,15 @@ logo_offset_z = 0.0;              // Logo Z offset (after scaling)
 // PCB revision
 rev = "rev.1";
 
-// Should be close to actual pcb dimensions... Used for support structure only so not critical
-pcb_x = 54;
-pcb_y = 30;
-pcb_support_border = 1;
+// PCB Dimensions (in mm)
+// NOTE: When using GenFixture.py, these values are automatically overridden
+// with actual board dimensions detected from KiCAD Edge.Cuts layer.
+// These are fallback defaults for manual OpenSCAD editing.
+//
+// Current board: RFID Fob
+pcb_x = 27.14;  // Board width (mm) - Auto-detected from Edge.Cuts
+pcb_y = 44.95;  // Board height (mm) - Auto-detected from Edge.Cuts
+pcb_support_border = 0;  // Set to 0 to use exact DXF size (no scaling)
 
 
 pcb_max_height_component = 17;
@@ -85,15 +103,15 @@ tp_correction_offset_y = 0.0;
 // make sure everything lines up.
 //projection (cut = false) alignment_check ();
 //mode = "3dmodel";
-//mode = "lasercut";
-mode = "validate";
+mode = "lasercut";
+//mode = "validate";
 //mode = "testcut";
 //mode = "none";
 
 // Uncomment for laser cuttable dxf
 if (mode == "lasercut") lasercut ();
 if (mode == "3dmodel") 3d_model ();
-if (mode == "validate") validate_testpoints (pcb_outline, pcb_track);
+if (mode == "validate") validate_testpoints (pcb_outline, pcb_track, pcb_x, pcb_y, 0);
 if (mode == "testcut") testcut ();
 
 // Smothness function for circles
@@ -356,7 +374,6 @@ module lock_tab ()
     //circle (r = tab_width / 2, h = mat_th, $fn = 20);
     circle (r = tab_width / 2, $fn = 20);
 	translate([0, tab_width / 2])
-    linear_extrude (height = mat_th)
     polygon([[0,0], [-tab_length/2 - tab_width /2, 0], [0,tab_length * 2], [0,0]]);
 
 }
@@ -488,7 +505,7 @@ module head_base_common ()
         
         // Calc (x,y) origin = (0, 0)
         origin_x = active_x_offset;
-        origin_y = active_x_offset + work_area_y;
+        origin_y = active_y_offset + work_area_y;
     
         // Loop over test points - TOP
         for ( i = [0 : 1 : len (test_points_top) - 1] ) {
@@ -718,25 +735,30 @@ module carrier (dxf_filename, pcb_x, pcb_y, border)
         sy_offset = (pcb_y - (pcb_y * scale_y)) / 2;
 
         // Import dxf, extrude and translate
-        translate ([mat_th + active_x_offset + tp_correction_offset_x, 
-                   work_area_y + active_y_offset + tp_correction_offset_y, 0])
+        translate ([active_x_offset + tp_correction_offset_x, 
+                   active_y_offset + work_area_y + tp_correction_offset_y, 0])
         translate ([sx_offset, -sy_offset, 0])
         hull () {
             linear_extrude (height = mat_th)
-            scale ([scale_x, scale_y, 1])
+            scale ([scale_x * dxf_scale, scale_y * dxf_scale, 1])
+            mirror ([0, 1])
             import (dxf_filename);
         }
         
         // Remove slots
         translate ([0, y/2, 0])
+        linear_extrude (height = mat_th)
         tng_n (y, 7);
         translate ([x - mat_th, y/2, 0])
+        linear_extrude (height = mat_th)
         tng_n (y, 7);
         
         // Remove holes
         translate ([mat_th / 2, y / 2, 0])
+        linear_extrude (height = mat_th)
         tnut_hole ();
         translate ([x - mat_th / 2, y / 2, 0])
+        linear_extrude (height = mat_th)
         tnut_hole ();
         
         // Add revision ID, also allows to determine which side is top
@@ -847,26 +869,50 @@ module 3d_model () {
     3d_latch ();
 }
 
-module validate_testpoints (dxf_filename,dxf_track)
+module validate_testpoints (dxf_filename, dxf_track, pcb_x, pcb_y, border)
 {
-    hull () {
-       import (dxf_filename);
-    }
-    color ([0, 1, 0])
-    import (dxf_track);
+    // Apply same positioning and scaling as carrier module for consistent view
+    offset_x = active_x_offset + tp_correction_offset_x;
+    offset_y = active_y_offset + work_area_y + tp_correction_offset_y;
     
-    // Loop over test points - TOP (red)
-    for ( i = [0 : 1 : len (test_points_top) - 1] ) {
-        color ([1, 0, 0])
-        translate ([test_points_top[i][0], -test_points_top[i][1]])
-        circle (r = pogo_r);
-    }
+    // Calculate scale factors (same as carrier module)
+    scale_x = 1 - ((2 * border) / pcb_x);
+    scale_y = 1 - ((2 * border) / pcb_y);
     
-    // Loop over test points - BOTTOM (blue)
-    for ( i = [0 : 1 : len (test_points_bottom) - 1] ) {
-        color ([0, 0, 1])
-        translate ([test_points_bottom[i][0], -test_points_bottom[i][1]])
-        circle (r = pogo_r);
+    // Get scale_offset (same as carrier module)
+    sx_offset = (pcb_x - (pcb_x * scale_x)) / 2;
+    sy_offset = (pcb_y - (pcb_y * scale_y)) / 2;
+    
+    translate ([offset_x, offset_y]) {
+        translate ([sx_offset, -sy_offset]) {
+            // PCB outline in magenta with transparency
+            color ([1, 0, 1, 0.5])
+            //hull () {
+               scale ([scale_x * dxf_scale, scale_y * dxf_scale])
+               mirror ([0, 1])
+               import (dxf_filename);
+           // }
+            
+            // PCB tracks in green
+            color ([0, 1, 0])
+            scale ([scale_x * dxf_scale, scale_y * dxf_scale])
+            mirror ([0, 1])
+            import (dxf_track);
+        }
+        
+        // Loop over test points - TOP (red) - positioned in work area coordinate system
+        for ( i = [0 : 1 : len (test_points_top) - 1] ) {
+            color ([1, 0, 0])
+            translate ([test_points_top[i][0] + sx_offset, -test_points_top[i][1] - sy_offset])
+            circle (r = pogo_r);
+        }
+
+        // Loop over test points - BOTTOM (blue) - positioned in work area coordinate system
+        for ( i = [0 : 1 : len (test_points_bottom) - 1] ) {
+            color ([0, 0, 1])
+            translate ([test_points_bottom[i][0] + sx_offset, -test_points_bottom[i][1] - sy_offset])
+            circle (r = pogo_r);
+        }
     }
 }
 
@@ -878,7 +924,7 @@ module lasercut ()
     xoffset1 = base_x + laser_pad;
     translate ([xoffset1, 0])
     projection(cut=true)
-    carrier (pcb_outline, pcb_x, pcb_y, -0.05);
+    carrier (pcb_outline, pcb_x, pcb_y, 0.03);  // Original: -0.05
     
     // Add head top
     xoffset2 = xoffset1 + base_x + laser_pad;

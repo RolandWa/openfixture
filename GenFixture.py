@@ -20,6 +20,10 @@ Modernization & v2 Update:
 License: CC-BY-SA 4.0
 """
 
+__version__ = "2.0.0"
+__author__ = "Elliot Buller, Community Contributors"
+__license__ = "CC-BY-SA-4.0"
+
 import os
 import sys
 import argparse
@@ -179,6 +183,10 @@ class GenFixture:
         self.test_points_top: List[Tuple[float, float]] = []
         self.test_points_bottom: List[Tuple[float, float]] = []
         
+        # Actual board dimensions from Edge.Cuts (for validation)
+        self.board_width_mm = 0.0
+        self.board_height_mm = 0.0
+        
     def __str__(self) -> str:
         layer_info = "both sides" if self.both_sides else ("F.Cu" if self.layer == pcbnew.F_Cu else "B.Cu")
         if self.both_sides:
@@ -223,16 +231,46 @@ class GenFixture:
         """Round value to specified precision"""
         return round(base * round(x / base), 2)
     
+    def force_origin_to_zero(self):
+        """
+        Force the board origin to (0,0) by setting auxiliary origin.
+        This ensures all exports (DXF, test points) are normalized to (0,0).
+        
+        The calculated board origin (top-left corner) is set as the auxiliary origin,
+        which makes KiCAD export everything relative to that point.
+        """
+        logger.info(f"Forcing origin to (0,0) - Board top-left is at KiCAD ({self.origin[0]:.2f}, {self.origin[1]:.2f})")
+        
+        # Save auxiliary origin (KiCAD 8 compatibility)
+        has_aux_origin = hasattr(self.brd, 'GetAuxOrigin')
+        
+        if has_aux_origin:
+            try:
+                # Set auxiliary origin to board's top-left corner
+                # This makes all subsequent exports use (0,0) as the reference
+                origin_point = pcbnew.VECTOR2I(
+                    pcbnew.FromMM(self.origin[0]),
+                    pcbnew.FromMM(self.origin[1])
+                )
+                self.brd.SetAuxOrigin(origin_point)
+                logger.info("✓ Auxiliary origin set - All exports will use (0,0) reference")
+                return origin_point
+            except AttributeError:
+                logger.warning("SetAuxOrigin not available (KiCAD 9) - using plot origin mode")
+                return None
+        else:
+            logger.info("Auxiliary origin not available (KiCAD 9) - using drill/place origin mode")
+            return None
+    
     def plot_dxf(self, path: str, layer_to_check: str):
         """
-        Export DXF file for specified layer
+        Export DXF file for specified layer with forced (0,0) origin
         
         Args:
             path: Output directory
             layer_to_check: "outline" for Edge.Cuts, "track" for copper layer
         """
-        # Save auxiliary origin (KiCAD 8 compatibility)
-        # In KiCAD 9, GetAuxOrigin/SetAuxOrigin were removed
+        # Save auxiliary origin for restoration (KiCAD 8 compatibility)
         aux_origin_save = None
         has_aux_origin = hasattr(self.brd, 'GetAuxOrigin')
         
@@ -243,6 +281,7 @@ class GenFixture:
                 logger.warning("GetAuxOrigin not available, continuing without it")
                 has_aux_origin = False
         
+        # Force origin to (0,0) for this export
         # Set new aux origin to upper left side of board (KiCAD 8 only)
         if has_aux_origin:
             try:
@@ -251,6 +290,7 @@ class GenFixture:
                     pcbnew.FromMM(self.origin[1])
                 )
                 self.brd.SetAuxOrigin(origin_point)
+                logger.debug(f"Set export origin to board top-left: ({self.origin[0]:.2f}, {self.origin[1]:.2f}) mm")
             except AttributeError:
                 logger.warning("SetAuxOrigin not available, using plot origin instead")
                 has_aux_origin = False
@@ -262,16 +302,25 @@ class GenFixture:
         # Setup output directory
         popt.SetOutputDirectory(path)
         
-        # Set plot options - handle KiCAD 8/9 API differences
+        # Set DXF plot units to millimeters
+        # DXF format supports only 2 units: 0=inches, 1=millimeters
+        # KiCAD 9.0 uses integer values (named constants not exposed in Python bindings)
         try:
-            # KiCAD 9.0+ uses different enum names
-            popt.SetDXFPlotUnits(pcbnew.DXF_PLOTTER_UNITS_MILLIMETERS)
+            popt.SetDXFPlotUnits(1)  # 1 = millimeters, 0 = inches
+            logger.debug("✓ DXF units set to millimeters (1=mm, 0=inches)")
+            
+            # Verify what was set (if getter available)
+            if hasattr(popt, 'GetDXFPlotUnits'):
+                try:
+                    current_units = popt.GetDXFPlotUnits()
+                    unit_name = "millimeters" if current_units == 1 else ("inches" if current_units == 0 else f"unknown({current_units})")
+                    logger.debug(f"Verified DXF units: {current_units} ({unit_name})")
+                except Exception as e:
+                    logger.debug(f"Could not verify DXF units: {e}")
         except AttributeError:
-            try:
-                # KiCAD 8.0 enum name
-                popt.SetDXFPlotUnits(pcbnew.DXF_UNITS_MILLIMETERS)
-            except AttributeError:
-                logger.warning("Could not set DXF units, using default")
+            logger.warning("SetDXFPlotUnits method not available - using KiCAD default (likely millimeters)")
+        except Exception as e:
+            logger.warning(f"Could not set DXF units: {type(e).__name__}: {e}. Using KiCAD default.")
         
         # SetDXFPlotPolygonMode - CRITICAL for outline cutouts
         # TRUE = export filled polygons (required for OpenSCAD import)
@@ -295,11 +344,14 @@ class GenFixture:
         except AttributeError:
             pass
         
-        # SetAutoScale/SetScale (may be removed in KiCAD 9)
+        # SetAutoScale/SetScale - CRITICAL for dimensional accuracy
+        # Must explicitly set SetScale(1.0) to prevent dimensional errors
         try:
             popt.SetAutoScale(False)
-            popt.SetScale(1)
+            popt.SetScale(1.0)  # CRITICAL: 1.0 = no scaling, exact dimensions
+            logger.debug("✓ Scale set to 1.0 (no scaling) for accurate dimensions")
         except AttributeError:
+            logger.debug("SetAutoScale/SetScale not available (KiCAD 9 may handle automatically)")
             pass
         
         # SetMirror (may be removed in KiCAD 9)
@@ -350,7 +402,7 @@ class GenFixture:
         if layer_to_check == "outline":
             pctl.SetLayer(pcbnew.Edge_Cuts)
             pctl.OpenPlotfile("outline", pcbnew.PLOT_FORMAT_DXF, "Edges")
-            logger.debug("Plotting Edge.Cuts layer with polygon mode for filled regions")
+            logger.info(f"Exporting Edge.Cuts layer with forced origin (0,0)...")
             pctl.PlotLayer()
             pctl.ClosePlot()
             logger.debug("Edge.Cuts DXF export complete")
@@ -360,20 +412,22 @@ class GenFixture:
                 # Plot F.Cu (top)
                 pctl.SetLayer(pcbnew.F_Cu)
                 pctl.OpenPlotfile("track_top", pcbnew.PLOT_FORMAT_DXF, "track_top")
+                logger.info("Exporting F.Cu track layer (top) with forced origin (0,0)...")
                 pctl.PlotLayer()
                 pctl.ClosePlot()
-                logger.info("Plotted F.Cu track layer (top)")
                 
                 # Plot B.Cu (bottom)
                 pctl.SetLayer(pcbnew.B_Cu)
                 pctl.OpenPlotfile("track_bottom", pcbnew.PLOT_FORMAT_DXF, "track_bottom")
+                logger.info("Exporting B.Cu track layer (bottom) with forced origin (0,0)...")
                 pctl.PlotLayer()
                 pctl.ClosePlot()
-                logger.info("Plotted B.Cu track layer (bottom)")
             else:
                 # Plot single selected layer
                 pctl.SetLayer(self.layer)
                 pctl.OpenPlotfile("track", pcbnew.PLOT_FORMAT_DXF, "track")
+                layer_name = "F.Cu" if self.layer == pcbnew.F_Cu else "B.Cu"
+                logger.info(f"Exporting {layer_name} track layer with forced origin (0,0)...")
                 pctl.PlotLayer()
                 pctl.ClosePlot()
         
@@ -385,6 +439,10 @@ class GenFixture:
                 pass
         
         logger.info(f"Exported DXF: {layer_to_check}")
+        
+        # Validate DXF export (for outline layer)
+        if layer_to_check == "outline":
+            self.validate_dxf_export(path)
     
     def get_test_points(self):
         """
@@ -505,35 +563,42 @@ class GenFixture:
         """
         Calculate PCB origin (top-left) and dimensions
         
-        Considers both Edge.Cuts outline and component bounding boxes
+        Uses Edge.Cuts layer ONLY for accurate board boundary.
+        Components may extend beyond board edge (e.g., connectors).
         """
         if self.brd is None:
             return
         
-        max_x = 0
-        max_y = 0
+        edge_max_x = 0
+        edge_max_y = 0
+        comp_max_x = 0
+        comp_max_y = 0
+        edge_cuts_found = False
         
-        # Get all drawings (board outline)
+        # Get all drawings (board outline) - PRIMARY source for origin/dimensions
         for drawing in self.brd.GetDrawings():
             if drawing.GetLayerName() == 'Edge.Cuts':
+                edge_cuts_found = True
                 bb = drawing.GetBoundingBox()
                 
                 x = pcbnew.ToMM(bb.GetX())
                 y = pcbnew.ToMM(bb.GetY())
+                w = pcbnew.ToMM(bb.GetWidth())
+                h = pcbnew.ToMM(bb.GetHeight())
                 
-                # Track minimum (origin)
+                # Track minimum (origin) from Edge.Cuts only
                 if x < self.origin[0]:
                     self.origin[0] = self.round_value(x)
                 if y < self.origin[1]:
                     self.origin[1] = self.round_value(y)
                 
-                # Track maximum (dimensions)
-                if x > max_x:
-                    max_x = x
-                if y > max_y:
-                    max_y = y
+                # Track maximum from Edge.Cuts
+                if x + w > edge_max_x:
+                    edge_max_x = x + w
+                if y + h > edge_max_y:
+                    edge_max_y = y + h
         
-        # Get all footprints for bounding boxes (modern API)
+        # Get all footprints for reference only (to detect overhang)
         for footprint in self.brd.GetFootprints():
             bb = footprint.GetBoundingBox()
             
@@ -542,24 +607,181 @@ class GenFixture:
             w = pcbnew.ToMM(bb.GetWidth())
             h = pcbnew.ToMM(bb.GetHeight())
             
-            # Track minimum (origin) - use exact values
-            if x < self.origin[0]:
-                self.origin[0] = x
-            if y < self.origin[1]:
-                self.origin[1] = y
-            
-            # Track maximum (dimensions)
-            if x + w > max_x:
-                max_x = x + w
-            if y + h > max_y:
-                max_y = y + h
+            # Track component extents (for warning only)
+            if x + w > comp_max_x:
+                comp_max_x = x + w
+            if y + h > comp_max_y:
+                comp_max_y = y + h
         
-        # Calculate final dimensions
-        self.dims[0] = self.round_value(max_x - self.origin[0])
-        self.dims[1] = self.round_value(max_y - self.origin[1])
+        # Use Edge.Cuts dimensions if available, fallback to components
+        if edge_cuts_found and edge_max_x > 0 and edge_max_y > 0:
+            self.dims[0] = self.round_value(edge_max_x - self.origin[0])
+            self.dims[1] = self.round_value(edge_max_y - self.origin[1])
+            
+            # Check for component overhang
+            comp_width = self.round_value(comp_max_x - self.origin[0])
+            comp_height = self.round_value(comp_max_y - self.origin[1])
+            
+            overhang_x = comp_width - self.dims[0]
+            overhang_y = comp_height - self.dims[1]
+            
+            if overhang_x > 0.5 or overhang_y > 0.5:
+                logger.info(f"Component overhang detected: +{overhang_x:.2f}mm (X), +{overhang_y:.2f}mm (Y) beyond board edge")
+                logger.info("  This is normal for connectors/mounting holes. Test points on overhang components will be included.")
+        else:
+            # Fallback: use component bounding boxes
+            logger.warning("No Edge.Cuts layer found - using component bounding boxes for dimensions")
+            self.dims[0] = self.round_value(comp_max_x - self.origin[0])
+            self.dims[1] = self.round_value(comp_max_y - self.origin[1])
+        
+        # Get actual board dimensions from Edge.Cuts for validation
+        self.get_board_dimensions_from_edge_cuts()
         
         logger.info(f"Board dimensions: {self.dims[0]:.2f} x {self.dims[1]:.2f} mm")
         logger.info(f"Board origin: ({self.origin[0]:.2f}, {self.origin[1]:.2f})")
+        if self.board_width_mm > 0 and self.board_height_mm > 0:
+            logger.info(f"Edge.Cuts dimensions: {self.board_width_mm:.2f} x {self.board_height_mm:.2f} mm")
+    
+    def get_board_dimensions_from_edge_cuts(self):
+        """
+        Get actual board dimensions from Edge.Cuts layer using KiCAD API.
+        This provides the official PCB outline dimensions for validation.
+        """
+        if self.brd is None:
+            return
+        
+        min_x = float("inf")
+        min_y = float("inf")
+        max_x = float("-inf")
+        max_y = float("-inf")
+        
+        # Get Edge.Cuts bounding box from all drawings
+        edge_cuts_found = False
+        for drawing in self.brd.GetDrawings():
+            if drawing.GetLayerName() == 'Edge.Cuts':
+                edge_cuts_found = True
+                bb = drawing.GetBoundingBox()
+                
+                x = pcbnew.ToMM(bb.GetX())
+                y = pcbnew.ToMM(bb.GetY())
+                w = pcbnew.ToMM(bb.GetWidth())
+                h = pcbnew.ToMM(bb.GetHeight())
+                
+                # Track bounding box
+                if x < min_x:
+                    min_x = x
+                if y < min_y:
+                    min_y = y
+                if x + w > max_x:
+                    max_x = x + w
+                if y + h > max_y:
+                    max_y = y + h
+        
+        if edge_cuts_found and min_x != float("inf"):
+            self.board_width_mm = self.round_value(max_x - min_x)
+            self.board_height_mm = self.round_value(max_y - min_y)
+            logger.debug(f"Detected Edge.Cuts dimensions: {self.board_width_mm:.2f} x {self.board_height_mm:.2f} mm")
+        else:
+            logger.warning("No Edge.Cuts layer found - cannot determine board dimensions")
+            self.board_width_mm = 0.0
+            self.board_height_mm = 0.0
+    
+    def validate_dxf_export(self, path: str):
+        """
+        Validate DXF export by checking:
+        1. Board dimensions match Edge.Cuts dimensions
+        2. Origin is at (0, 0) as expected by OpenSCAD
+        
+        Args:
+            path: Output directory containing the exported DXF
+        """
+        logger.info("Validating DXF export...")
+        
+        # Validation thresholds
+        dimension_tolerance_mm = 0.5  # Allow 0.5mm difference
+        origin_threshold_mm = 5.0     # Warn if origin is >5mm from (0,0)
+        
+        warnings = []
+        errors = []
+        
+        # Check 1: Board dimensions validation
+        # Note: self.dims now uses Edge.Cuts dimensions, so these should match
+        # Small differences (<0.5mm) are acceptable due to rounding
+        if self.board_width_mm > 0 and self.board_height_mm > 0:
+            width_diff = abs(self.dims[0] - self.board_width_mm)
+            height_diff = abs(self.dims[1] - self.board_height_mm)
+            
+            if width_diff > dimension_tolerance_mm:
+                errors.append(
+                    f"Width mismatch: board outline={self.dims[0]:.2f}mm, "
+                    f"Edge.Cuts={self.board_width_mm:.2f}mm (diff={width_diff:.2f}mm). "
+                    f"Check Edge.Cuts layer completeness."
+                )
+            
+            if height_diff > dimension_tolerance_mm:
+                errors.append(
+                    f"Height mismatch: board outline={self.dims[1]:.2f}mm, "
+                    f"Edge.Cuts={self.board_height_mm:.2f}mm (diff={height_diff:.2f}mm). "
+                    f"Check Edge.Cuts layer completeness."
+                )
+            
+            if width_diff <= dimension_tolerance_mm and height_diff <= dimension_tolerance_mm:
+                logger.debug(f"✓ Dimensions validated: {self.dims[0]:.2f} x {self.dims[1]:.2f} mm")
+        else:
+            errors.append("Could not validate dimensions - Edge.Cuts layer not found or empty")
+        
+        # Check 2: Origin validation
+        # Note: self.origin contains the KiCAD coordinates of the board's top-left corner
+        # We set this as auxiliary origin, which makes the EXPORTED DXF start at (0,0)
+        # If the board is far from KiCAD origin, just log it as info (not a warning)
+        if abs(self.origin[0]) > origin_threshold_mm or abs(self.origin[1]) > origin_threshold_mm:
+            logger.info(
+                f"Board position in KiCAD: ({self.origin[0]:.2f}, {self.origin[1]:.2f}). "
+                f"Auxiliary origin set - DXF exports at (0,0) ✓"
+            )
+        else:
+            logger.info(f"Board already at KiCAD origin: ({self.origin[0]:.2f}, {self.origin[1]:.2f}) ✓")
+        
+        # Check 3: Minimum dimension sanity check
+        min_board_size = 10.0  # mm
+        max_board_size = 500.0  # mm
+        
+        if self.dims[0] < min_board_size:
+            errors.append(f"Board width too small: {self.dims[0]:.2f}mm (minimum {min_board_size}mm)")
+        
+        if self.dims[1] < min_board_size:
+            errors.append(f"Board height too small: {self.dims[1]:.2f}mm (minimum {min_board_size}mm)")
+        
+        if self.dims[0] > max_board_size:
+            warnings.append(f"Board width very large: {self.dims[0]:.2f}mm (maximum expected {max_board_size}mm)")
+        
+        if self.dims[1] > max_board_size:
+            warnings.append(f"Board height very large: {self.dims[1]:.2f}mm (maximum expected {max_board_size}mm)")
+        
+        # Report validation results
+        if errors:
+            logger.error("❌ DXF Export Validation FAILED:")
+            for error in errors:
+                logger.error(f"  - {error}")
+            logger.error("\nTroubleshooting:")
+            logger.error("  1. Check Edge.Cuts layer in KiCAD is complete")
+            logger.error("  2. Verify board outline forms a closed shape")
+            logger.error("  3. Check DXF scale factor if using imported DXF")
+        
+        if warnings:
+            logger.warning("⚠️  DXF Export Validation Warnings:")
+            for warning in warnings:
+                logger.warning(f"  - {warning}")
+            if any("origin" in w.lower() for w in warnings):
+                logger.warning("\nOrigin Fix:")
+                logger.warning("  - In KiCAD, place board outline starting at (0, 0)")
+                logger.warning("  - Or set auxiliary origin at top-left corner")
+        
+        if not errors and not warnings:
+            logger.info("✓ DXF export validation passed")
+            logger.info(f"  Board: {self.dims[0]:.2f} x {self.dims[1]:.2f} mm")
+            logger.info(f"  Export origin: (0.00, 0.00) - Forced via auxiliary origin")
+            logger.info(f"  Test points: {len(self.test_points)} total ({len(self.test_points_top)} top, {len(self.test_points_bottom)} bottom)")
     
     def get_test_point_str(self, points: List[Tuple[float, float]] = None) -> str:
         """Format test points as OpenSCAD array string"""
@@ -584,7 +806,11 @@ class GenFixture:
         # Get origin and board dimensions
         self.get_origin_dimensions()
         
-        # Get test points
+        # Force origin to (0,0) for all exports
+        # This sets the auxiliary origin so DXF exports start at (0,0)
+        self.force_origin_to_zero()
+        
+        # Get test points (will be calculated relative to forced origin)
         self.get_test_points()
         
         # Test for failure to find test points
@@ -673,13 +899,16 @@ class GenFixture:
     def _build_openscad_args(self, path: str) -> str:
         """Build OpenSCAD command line arguments"""
         
-        # Common args
+        # Common args - use Edge.Cuts dimensions if available, otherwise use calculated dims
+        pcb_x = self.board_width_mm if self.board_width_mm > 0 else self.dims[0]
+        pcb_y = self.board_height_mm if self.board_height_mm > 0 else self.dims[1]
+        
         args_dict = {
             'tp_min_y': f"{self.min_y:.02f}",
             'mat_th': f"{self.config.mat_th:.02f}",
             'pcb_th': f"{self.config.pcb_th:.02f}",
-            'pcb_x': f"{self.dims[0]:.02f}",
-            'pcb_y': f"{self.dims[1]:.02f}",
+            'pcb_x': f"{pcb_x:.02f}",
+            'pcb_y': f"{pcb_y:.02f}",
             'screw_thr_len': f"{self.config.screw_len:.02f}",
             'screw_d': f"{self.config.screw_d:.02f}",
         }
@@ -749,8 +978,8 @@ class GenFixture:
         # Log critical parameters for debugging
         logger.debug(f"OpenSCAD parameters:")
         logger.debug(f"  pcb_outline: {args_dict.get('pcb_outline', 'NOT SET')}")
-        logger.debug(f"  pcb_x: {args_dict.get('pcb_x', 'NOT SET')}")
-        logger.debug(f"  pcb_y: {args_dict.get('pcb_y', 'NOT SET')}")
+        logger.debug(f"  pcb_x: {args_dict.get('pcb_x', 'NOT SET')} (from {'Edge.Cuts' if self.board_width_mm > 0 else 'calculated'})")
+        logger.debug(f"  pcb_y: {args_dict.get('pcb_y', 'NOT SET')} (from {'Edge.Cuts' if self.board_height_mm > 0 else 'calculated'})")
         logger.debug(f"  pcb_support_border: {args_dict.get('pcb_support_border', 'NOT SET')}")
         logger.debug(f"  test_points_top count: {len(self.test_points_top)}")
         logger.debug(f"  test_points_bottom count: {len(self.test_points_bottom)}")

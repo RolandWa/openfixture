@@ -15,6 +15,12 @@ sync_to_kicad_config.ps1
 user_paths.txt
 local_settings.json
 
+# Company-specific assets (not for public repository)
+RA_logo.svg
+
+# Personal analysis scripts (use .template versions)
+analyze_dxf.py
+
 # ----------------
 # Python
 # ----------------
@@ -92,6 +98,15 @@ fixture*/
 
 # OpenSCAD temporary files
 *.scad~
+
+# ----------------
+# Build and Distribution
+# ----------------
+dist/
+*.zip
+!*example*.zip
+packages/
+release/
 
 # ----------------
 # Laser Cutting Files

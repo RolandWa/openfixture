@@ -68,7 +68,6 @@ if (-not (Test-Path $SupportDir)) {
 # Plugin files to sync to KiCad plugins directory (flat structure)
 $PluginFiles = @(
     "openfixture.py",
-    "OpenFixtureDlg.py",
     "OpenFixture.png"
 )
 

@@ -17,7 +17,8 @@ if ($kicadProcesses) {
 
 # 2. Clear ALL Python cache in KiCAD directory
 Write-Host "`n[2] Clearing Python cache..." -ForegroundColor Yellow
-$kicadBase = "C:\Users\RWache\OneDrive - Rockwell Automation, Inc\Simulation tools\KiCad\9.0"
+# User should set KICAD_PATH environment variable or modify this path
+$kicadBase = $env:KICAD_PATH ?? "$env:APPDATA\KiCad\9.0"
 $cleared = 0
 
 # Clear __pycache__ directories

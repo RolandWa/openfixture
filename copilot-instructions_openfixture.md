@@ -363,14 +363,13 @@ genfixture.bat C:\path\to\board.kicad_pcb
 
 ---
 
-### 2.4 KiCAD Plugin (openfixture.py + OpenFixtureDlg.py)
+### 2.4 KiCAD Plugin (openfixture.py)
 
 **Purpose**: GUI integration for KiCAD PCB Editor
 
 **File Structure**:
 ```
-openfixture.py          # Plugin main class
-OpenFixtureDlg.py       # wxPython dialog (wxFormBuilder generated)
+openfixture.py          # Plugin main class with modern OpenFixtureDialog
 OpenFixture.png         # Toolbar icon
 ```
 
@@ -405,26 +404,25 @@ OpenFixture().register()
 - **Linux**: `~/.local/share/kicad/<version>/3rdparty/plugins/`
 - **macOS**: `~/Library/Application Support/kicad/<version>/3rdparty/plugins/`
 
-**Dialog Parameters** (OpenFixtureDlg.py):
+**Dialog Parameters** (OpenFixtureDialog in openfixture.py):
 ```python
-class OpenFixtureDlg(wx.Dialog):
+class OpenFixtureDialog(wx.Dialog):
     """
-    wxFormBuilder-generated dialog with fixture parameters
+    Modern multi-tab dialog with fixture parameters
+    Replaces auto-generated OpenFixtureDlg with better UX
     
-    Controls:
-    - m_PcbTh: PCB thickness (default: 1.6mm)
-    - m_rev: Revision string (default: "0.1")
-    - m_checkLayerTop: Top layer checkbox
-    - m_checkLayerBottom: Bottom layer checkbox
-    - m_screwLen: Screw length (default: 16.0mm)
-    - m_screwDia: Screw diameter (default: 3.0mm)
-    - m_nutTh: Nut thickness (default: 2.4mm)
-    - m_nutF2F: Nut flat-to-flat (default: 5.45mm)
-    - m_distanceMM1111: Nut corner-to-corner (default: 6.10mm)
-    - m_distanceMM11111: Washer thickness (default: 1.0mm)
-    - m_distanceMM111111: Pogo pin length (default: 16mm)
-    - m_buttonCreate: Generate fixture button
-    - m_buttonCancel: Cancel button
+    Tabs:
+    - Board: PCB thickness, revision, layer selection, pad types (SMD/PTH)
+    - Material: Material thickness with common presets
+    - Hardware: Screw and nut parameters
+    - Advanced: Washer, border, pogo pin length, verbose logging
+    
+    Features:
+    - TOML configuration auto-loading
+    - Material presets (Acrylic 2.5mm/3mm/4mm, Plywood 3mm/5mm)
+    - Mutual exclusion for layer selection (Top OR Bottom)
+    - SMD/PTH pad filtering options
+    - Progress dialog during generation
     """
 ```
 
@@ -1734,7 +1732,7 @@ def onCreateClick(self, event):
     return self.EndModal(wx.ID_OK)
 ```
 
-**Add Material Thickness to Dialog** (requires editing OpenFixtureDlg.py in wxFormBuilder).
+**Note**: Material thickness is now included in the modern OpenFixtureDialog (Material tab).
 
 ---
 
@@ -1963,14 +1961,14 @@ python GenFixture.py \
 
 ```
 openfixture/
-├── GenFixture.py              # Main script (498 lines)
-├── openfixture.py             # KiCAD plugin (60 lines)
-├── OpenFixtureDlg.py          # GUI dialog (228 lines)
+├── GenFixture.py              # Main script (1050+ lines, modernized)
+├── openfixture.py             # KiCAD plugin (1015+ lines with OpenFixtureDialog)
 ├── openfixture.scad           # OpenSCAD model (926 lines)
 ├── genfixture.bat             # Windows wrapper
 ├── genfixture.sh              # Linux/Mac wrapper
 ├── README.md                  # Project documentation
 ├── osh_logo.dxf               # Logo graphic (optional)
+├── fixture_config.toml        # TOML configuration template
 └── copilot-instructions_openfixture.md  # This file
 
 fixture-<rev>/                 # Output directory
@@ -2856,8 +2854,7 @@ The `sync_to_kicad.ps1` script has been updated to sync only active production f
 
 ```powershell
 $PluginFiles = @(
-    "openfixture.py",           # Main plugin (was openfixture_v2.py)
-    "OpenFixtureDlg.py",
+    "openfixture.py",           # Main plugin with integrated OpenFixtureDialog
     "OpenFixture.png"
 )
 

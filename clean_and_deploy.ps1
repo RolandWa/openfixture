@@ -18,7 +18,8 @@ if ($kicad) {
 
 # Step 2: Clear ALL Python cache
 Write-Host "`n[2] Clearing Python cache..." -ForegroundColor Yellow
-$kicadBase = "C:\Users\RWache\OneDrive - Rockwell Automation, Inc\Simulation tools\KiCad\9.0"
+# User should set KICAD_PATH environment variable or modify this path
+$kicadBase = $env:KICAD_PATH ?? "$env:APPDATA\KiCad\9.0"
 $cleared = 0
 
 Get-ChildItem "$kicadBase" -Recurse -Directory -Filter "__pycache__" -Force -ErrorAction SilentlyContinue | ForEach-Object {
@@ -40,7 +41,7 @@ Write-Host "`n[3] Deploying fresh files..." -ForegroundColor Yellow
 # Step 4: Verify
 Write-Host "`n[4] Verifying deployment..." -ForegroundColor Yellow
 
-$pluginFile = "C:\Users\RWache\OneDrive - Rockwell Automation, Inc\Simulation tools\KiCad\9.0\3rdparty\plugins\openfixture.py"
+$pluginFile = "$kicadBase\3rdparty\plugins\openfixture.py"
 $hasCheckBox = Select-String -Path $pluginFile -Pattern "wx\.CheckBox.*Top Layer" -Quiet
 
 if ($hasCheckBox) {
@@ -50,7 +51,7 @@ if ($hasCheckBox) {
 }
 
 # Check GenFixture.py exists
-$genFixture = "C:\Users\RWache\OneDrive - Rockwell Automation, Inc\Simulation tools\KiCad\9.0\3rdparty\plugins\openfixture_support\GenFixture.py"
+$genFixture = "$kicadBase\3rdparty\plugins\openfixture_support\GenFixture.py"
 if (Test-Path $genFixture) {
     Write-Host "    [OK] GenFixture.py exists" -ForegroundColor Green
 } else {

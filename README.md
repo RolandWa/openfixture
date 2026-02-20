@@ -27,6 +27,17 @@ OpenFixture is a comprehensive PCB test fixture generator that integrates direct
 
 ### Installation
 
+#### Option 1: KiCAD Plugin Manager (Recommended)
+
+1. Open KiCAD PCB Editor
+2. Go to: `Tools → Plugin and Content Manager`
+3. Search for: **OpenFixture**
+4. Click: `Install`
+5. Restart KiCAD
+6. Access: `Tools → External Plugins → OpenFixture Generator`
+
+#### Option 2: Manual Installation
+
 ```bash
 # 1. Clone or download this repository
 git clone https://github.com/tinylabs/openfixture.git
@@ -45,8 +56,7 @@ notepad sync_to_kicad_config.ps1  # Windows
 # Then run the sync script:
 .\sync_to_kicad.ps1  # Windows PowerShell
 
-# Alternative: Manual installation
-# Copy to KiCAD plugins directory:
+# Alternative: Copy manually to KiCAD plugins directory:
 # Windows: %APPDATA%\kicad\<version>\3rdparty\plugins\
 # Linux: ~/.local/share/kicad/<version>/3rdparty/plugins/
 # macOS: ~/Library/Application Support/kicad/<version>/3rdparty/plugins/
