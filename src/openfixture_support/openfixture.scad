@@ -47,10 +47,10 @@ board_origin_x = 86.51;  // KiCAD X coordinate of board top-left (passed from Ge
 board_origin_y = 68.50;  // KiCAD Y coordinate of board top-left (passed from GenFixture.py)
 
 // DXF outline of pcb
-pcb_outline = "./CSI_current_measurment-outline.dxf";
+pcb_outline = "../../fixture-rev_01/CSI_current_measurment-outline.dxf";
 //pcb_outline = "./rfid_fob-outline.dxf";
-//pcb_outline = "./CSI_current_measurment-Edge_Cuts.dxf";
-pcb_track = "./CSI_current_measurment-track.dxf";
+//pcb_outline = "../../fixture-rev_01/CSI_current_measurment-Edge_Cuts.dxf";
+pcb_track = "../../fixture-rev_01/CSI_current_measurment-track.dxf";
 
 // DXF scale correction factor
 // If DXF is exported at wrong scale, adjust here
@@ -81,9 +81,7 @@ rev = "rev.1";
 // Current board: CSI Current Measurement
 pcb_x = 100;  // Board width (mm) - Auto-detected from Edge.Cuts
 //pcb_y = 51.72;  // Board height (mm) - Auto-detected from Edge.Cuts
-pcb_y = 51.72; 
-pcb_support_border = 0;  // Set to 0 to use exact DXF size (no scaling)
-
+pcb_y = 51.72;
 
 pcb_max_height_component = 17;
 
@@ -97,6 +95,12 @@ work_area_y = pcb_y;
 
 // Thickness of pcb
 pcb_th = 1.6;  // Standard PCB size
+
+// Bottom carrier inset (how much smaller the cutout is on each side)
+// Larger values = more PCB support, but tighter fit required
+// Example: 1.0mm means cutout is 2mm smaller (1mm per side)
+// Different boards may need different support levels
+bottom_carrier_inset = 1.0;  // mm inset on each side
 
 //
 // End PCB input
@@ -112,16 +116,18 @@ tp_correction_offset_y = 0.0;
 // make sure everything lines up.
 //projection (cut = false) alignment_check ();
 //mode = "3dmodel";
-//mode = "lasercut";
-mode = "validate";
+mode = "lasercut";
+//mode = "validate";
 //mode = "testcut";
+//mode = "check_aligned";
 //mode = "none";
 
-// Uncomment for laser cuttable dxf
+// Uncomment for laser cuttable dxf/
 if (mode == "lasercut") lasercut ();
 if (mode == "3dmodel") 3d_model ();
 if (mode == "validate") validate_testpoints (pcb_outline, pcb_track, pcb_x, pcb_y, 0);
 if (mode == "testcut") testcut ();
+if (mode == "check_aligned") check_aligned ();
 
 // Smothness function for circles
 $fn = 15;
@@ -736,14 +742,16 @@ module carrier (dxf_filename, pcb_x, pcb_y, border)
     x = base_x;
     y = head_y;
     
-    // Calculate scale factors
+    // Calculate scale factors for PCB cutout
+    // border > 0: cutout is smaller (more support) - used for bottom carrier
+    // border = 0: cutout matches PCB size (tight fit) - used for top carrier
     scale_x = 1 - ((2 * border) / pcb_x);
     scale_y = 1 - ((2 * border) / pcb_y);
 
     difference () {
         cube ([x, y, mat_th]);
         
-        // Get scale_offset
+// Calculate centering offset (keeps cutout centered when scaled)
         sx_offset = (pcb_x - (pcb_x * scale_x)) / 2;
         sy_offset = (pcb_y - (pcb_y * scale_y)) / 2;
 
@@ -752,7 +760,7 @@ module carrier (dxf_filename, pcb_x, pcb_y, border)
         // DXF is at absolute coords, mirror flips Y, then position in fixture frame
         translate ([active_x_offset + tp_correction_offset_x - board_origin_x, 
                    active_y_offset + work_area_y + tp_correction_offset_y + board_origin_y, 0])
-        translate ([sx_offset, -sy_offset, 0])
+        translate ([-sx_offset, -sy_offset, 0])  // Subtract offset to center scaled cutout with unscaled one
         hull () {
             linear_extrude (height = mat_th)
             scale ([scale_x * dxf_scale, scale_y * dxf_scale, 1])
@@ -848,12 +856,14 @@ module 3d_base () {
     linear_extrude(height = mat_th) 
     spacer ();
     
-    // Add carrier blank and carrier
+    // Add carrier plates (centered on each other)
+    // Bottom carrier: smaller cutout for better PCB support
+    // Note: carrier() creates 3D cube directly, no linear_extrude needed
     translate ([-mat_th, 0, base_z - (2 * mat_th)])
-    linear_extrude(height = mat_th) 
-    carrier (pcb_outline, pcb_x, pcb_y, pcb_support_border);
+    carrier (pcb_outline, pcb_x, pcb_y, bottom_carrier_inset);
+    
+    // Top carrier: tight fit (no inset)
     translate ([-mat_th, 0, base_z - mat_th])
-    linear_extrude(height = mat_th) 
     carrier (pcb_outline, pcb_x, pcb_y, 0);
 }
 
@@ -917,15 +927,64 @@ module validate_testpoints (dxf_filename, dxf_track, pcb_x, pcb_y, border)
     }
 }
 
+module check_aligned ()
+{
+    // ALIGNMENT CHECK MODE
+    // Stacks all 4 boards on top of each other to verify alignment:
+    // 1. Bottom carrier (cyan) - with inset for PCB support
+    // 2. Top carrier (magenta) - tight fit
+    // 3. Head base (red) - pogo pin holes for bottom layer
+    // 4. Head top (blue) - pogo pin holes for top layer
+    
+    // Bottom carrier (cyan with transparency)
+    color ([0, 1, 1, 0.3])
+    projection(cut=true)
+    carrier (pcb_outline, pcb_x, pcb_y, bottom_carrier_inset);
+    
+    // Top carrier (magenta with transparency)
+    color ([1, 0, 1, 0.3])
+    projection(cut=true)
+    carrier (pcb_outline, pcb_x, pcb_y, 0);
+    
+    // Head base with pogo pins (red with transparency)
+    color ([1, 0, 0, 0.3])
+    head_base ();
+    
+    // Head top with pogo pins (blue with transparency)
+    //color ([0, 0, 1, 0.3])
+    head_top ();
+    
+    // PCB outline for reference (yellow, thin line)
+    color ([1, 1, 0])
+    difference () {
+        hull () {
+            translate ([active_x_offset - board_origin_x, 
+                       active_y_offset + work_area_y + board_origin_y, 0])
+            scale ([dxf_scale, dxf_scale])
+            import (pcb_outline);
+        }
+        // Inner cutout to show just the outline
+        hull () {
+            translate ([active_x_offset - board_origin_x, 
+                       active_y_offset + work_area_y + board_origin_y, 0])
+            scale ([0.99 * dxf_scale, 0.99 * dxf_scale])
+            import (pcb_outline);
+        }
+    }
+}
+
 module lasercut ()
 {
     // Add carrier panels (use projection to convert 3D to 2D for laser cutting)
+    // Bottom carrier: smaller cutout (more PCB support)
     projection(cut=true)
-    carrier (pcb_outline, pcb_x, pcb_y, pcb_support_border);
+    carrier (pcb_outline, pcb_x, pcb_y, bottom_carrier_inset);
     xoffset1 = base_x + laser_pad;
+    
+    // Top carrier: tight fit
     translate ([xoffset1, 0])
     projection(cut=true)
-    carrier (pcb_outline, pcb_x, pcb_y, 0.03);  // Original: -0.05
+    carrier (pcb_outline, pcb_x, pcb_y, 0);
     
     // Add head top
     xoffset2 = xoffset1 + base_x + laser_pad;

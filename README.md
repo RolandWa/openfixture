@@ -63,19 +63,21 @@ python build.py --clean      # Clean build artifacts
 - Linux: `~/.local/share/kicad/9.0/3rdparty/plugins/`
 - macOS: `~/Documents/KiCAD/9.0/3rdparty/plugins/`
 
-#### Option 3: Legacy Sync Script
+#### Option 3: Development Sync Script
 
+**Fast sync for testing code changes**:
 ```powershell
 # First, set up your personal configuration (one-time):
 cp sync_to_kicad_config.ps1.template sync_to_kicad_config.ps1
 # Edit sync_to_kicad_config.ps1 with your KiCAD plugins path
 
-# Deploy to KiCAD:
+# Deploy to KiCAD (auto-clears Python cache):
 .\sync_to_kicad.ps1  # Windows PowerShell
 
-# If you encounter import errors after updates:
-.\clean_and_deploy.ps1  # Clear Python cache and redeploy
+# Restart KiCAD to load changes
 ```
+
+**Benefits**: Fastest way to test code changes - copies directly from `src/` to KiCAD, automatically clears Python cache to force reload.
 
 ### 🔒 Security Note
 

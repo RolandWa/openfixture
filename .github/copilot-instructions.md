@@ -45,6 +45,29 @@ See [README.md](../README.md) for features and installation.
 
 ## Build & Deployment
 
+### Development Workflow (RECOMMENDED)
+
+**Fast sync for development and code verification**:
+```powershell
+# 1. Configure paths (one-time setup):
+cp sync_to_kicad_config.ps1.template sync_to_kicad_config.ps1
+# Edit sync_to_kicad_config.ps1 with your KiCAD plugins path
+
+# 2. Fast sync to KiCAD (copies from src/ to plugins directory):
+.\sync_to_kicad.ps1
+
+# 3. Restart KiCAD to load changes
+```
+
+**Why use sync_to_kicad.ps1?**
+- ✅ Fastest way to test code changes (no rebuild needed)
+- ✅ Automatically clears Python cache to force reload
+- ✅ Copies directly from `src/` to KiCAD plugins directory
+- ✅ Allows immediate verification of changes in KiCAD
+- ✅ Auto-detects KiCAD path or uses custom config
+
+### Production Build (for distribution)
+
 **Build KiCAD plugin package**:
 ```powershell
 # Build package + ZIP for distribution
@@ -60,18 +83,22 @@ python build.py --no-zip
 python build.py --clean
 ```
 
-**Legacy sync script** (still supported):
-```powershell
-# 1. Configure paths (one-time):
-cp sync_to_kicad_config.ps1.template sync_to_kicad_config.ps1
-# Edit sync_to_kicad_config.ps1 with your KiCAD plugins path
+**When to use build.py**:
+- Creating release packages for distribution
+- Generating the official plugin ZIP file
+- Deploying to KiCAD Plugin Manager (PCM)
 
-# 2. Deploy:
-.\sync_to_kicad.ps1
+### Script Inventory
 
-# 3. If cache issues (stale imports):
-.\clean_and_deploy.ps1
-```
+**Active Scripts:**
+- `sync_to_kicad.ps1` - **Primary development workflow** (fast sync + cache clear)
+- `build.py` - Production build system (creates distribution packages)
+- `deploy_to_repository.ps1` - External deployment to KiCAD-Plugin distribution repo
+
+**Deprecated Scripts (outdated for src-layout):**
+- ~~`clean_and_deploy.ps1`~~ - References old flat structure
+- ~~`force_update.ps1`~~ - References old flat structure  
+- ~~`test_functionality.ps1`~~ - References non-existent v2 files
 
 **Output directory structure** (after build):
 ```
@@ -167,8 +194,9 @@ except ImportError:
 | Problem | Cause | Solution |
 |---------|-------|----------|
 | Plugin doesn't load | Wrong path in config | Re-run sync after editing `sync_to_kicad_config.ps1` |
-| Import errors after update | Stale `.pyc` cache | Run `clean_and_deploy.ps1` |
-| Changes not visible | Wrong Python executing | Check KiCAD uses bundled Python |
+| Import errors after update | Stale `.pyc` cache | `sync_to_kicad.ps1` auto-clears cache |
+| Changes not visible | KiCAD still running | Restart KiCAD after running sync script |
+| Code changes don't apply | Wrong Python executing | Check KiCAD uses bundled Python |
 
 ### Test Point Extraction
 
