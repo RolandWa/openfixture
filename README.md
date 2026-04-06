@@ -36,33 +36,45 @@ OpenFixture is a comprehensive PCB test fixture generator that integrates direct
 5. Restart KiCAD
 6. Access: `Tools → External Plugins → OpenFixture Generator`
 
-#### Option 2: Manual Installation
+#### Option 2: Build and Install from Source
 
 ```bash
 # 1. Clone or download this repository
-git clone https://github.com/tinylabs/openfixture.git
+git clone https://github.com/RolandWa/openfixture.git
 cd openfixture
 
 # 2. Install Python dependencies (optional, for TOML support)
 pip install tomli  # Only needed for Python < 3.11
 
-# 3. Install KiCAD plugin using sync script (recommended)
-# First, set up your personal configuration:
+# 3. Build and deploy the plugin
+python build.py --deploy
+
+# The plugin will be automatically installed to your KiCAD plugins directory
+# Restart KiCAD to load the plugin
+
+# Alternative deployment methods:
+python build.py              # Build package + ZIP for distribution
+python build.py --zip        # Create ZIP only (for Plugin Manager)
+python build.py --clean      # Clean build artifacts
+```
+
+**Manual Installation Paths**:
+- Windows: `%APPDATA%\kicad\9.0\3rdparty\plugins\`
+- Linux: `~/.local/share/kicad/9.0/3rdparty/plugins/`
+- macOS: `~/Documents/KiCAD/9.0/3rdparty/plugins/`
+
+#### Option 3: Legacy Sync Script
+
+```powershell
+# First, set up your personal configuration (one-time):
 cp sync_to_kicad_config.ps1.template sync_to_kicad_config.ps1
 # Edit sync_to_kicad_config.ps1 with your KiCAD plugins path
-notepad sync_to_kicad_config.ps1  # Windows
-# OR nano sync_to_kicad_config.ps1  # Linux/macOS
 
-# Then run the sync script:
+# Deploy to KiCAD:
 .\sync_to_kicad.ps1  # Windows PowerShell
 
-# Alternative: Copy manually to KiCAD plugins directory:
-# Windows: %APPDATA%\kicad\<version>\3rdparty\plugins\
-# Linux: ~/.local/share/kicad/<version>/3rdparty/plugins/
-# macOS: ~/Library/Application Support/kicad/<version>/3rdparty/plugins/
-
-cp openfixture.py <plugins_directory>/
-cp GenFixture.py <plugins_directory>/
+# If you encounter import errors after updates:
+.\clean_and_deploy.ps1  # Clear Python cache and redeploy
 ```
 
 ### 🔒 Security Note
@@ -73,7 +85,7 @@ Personal configuration files (like `sync_to_kicad_config.ps1`) are excluded from
 
 **Command Line**:
 ```bash
-python3 GenFixture.py \
+python src/openfixture_support/GenFixture.py \
     --board your_board.kicad_pcb \
     --mat_th 3.0 \
     --out fixture-output
@@ -83,7 +95,7 @@ python3 GenFixture.py \
 ```bash
 # 1. Create fixture_config.toml in your project directory
 # 2. Run with config:
-python3 GenFixture.py \
+python src/openfixture_support/GenFixture.py \
     --board your_board.kicad_pcb \
     --config fixture_config.toml \
     --out fixture-output
@@ -100,7 +112,49 @@ python3 GenFixture.py \
 
 ---
 
-## 📋 Requirements
+## � Project Structure
+
+OpenFixture uses a modern Python src-layout for clean separation between source code and build artifacts:
+
+```
+openfixture/
+├── src/                              # Source code directory
+│   ├── __init__.py                   # Plugin registration entry point
+│   ├── openfixture.py                # KiCAD ActionPlugin (wxPython UI)
+│   └── openfixture_support/          # Core package
+│       ├── __init__.py
+│       ├── GenFixture.py             # Main processing engine
+│       ├── openfixture.scad          # OpenSCAD fixture generator
+│       └── fixture_config.toml       # Configuration template
+├── build.py                          # KiCAD plugin build system
+├── setup.py                          # Python package installation
+├── pyproject.toml                    # Modern Python packaging config
+└── .github/
+    └── copilot-instructions.md       # Development guidelines
+```
+
+**Build Output**:
+```
+build/
+└── com_github_RolandWa_openfixture/  # Plugin package for KiCAD
+    ├── __init__.py
+    ├── openfixture.py
+    ├── OpenFixture.png               # Plugin icon
+    ├── plugin.json                   # KiCAD plugin descriptor
+    ├── metadata.json                 # KiCAD PCM metadata
+    ├── openfixture_support/
+    └── README.md
+```
+
+**Benefits of src-layout**:
+- Prevents accidental imports from development directory
+- Clear separation between source and built artifacts
+- Standard Python packaging structure
+- Consistent with modern Python projects
+
+---
+
+## �📋 Requirements
 
 ### Software
 - **KiCAD** 8.0 or 9.0+
@@ -400,7 +454,7 @@ ignore_layer = "Eco1.User" # Exclude pads on this layer from test points
 ### Command-Line Arguments
 
 ```bash
-python3 GenFixture.py \
+python src/openfixture_support/GenFixture.py \
     --board <file.kicad_pcb>        # Required: PCB file path
     --mat_th <mm>                   # Required: Material thickness
     --out <directory>               # Required: Output directory
@@ -424,11 +478,12 @@ python3 GenFixture.py \
 ## 📖 Documentation
 
 - **[POGO_PINS.md](POGO_PINS.md)** - Comprehensive pogo pin selection and specification guide
-- **[copilot-instructions_openfixture.md](copilot-instructions_openfixture.md)** - Complete technical documentation
+- **[.github/copilot-instructions.md](.github/copilot-instructions.md)** - Project structure and development guidelines
 - **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** - Upgrade guide from legacy versions
-- **[fixture_config.toml](fixture_config.toml)** - Configuration file template
+- **[src/openfixture_support/fixture_config.toml](src/openfixture_support/fixture_config.toml)** - Configuration file template
+- **[README.md](README.md)** - This file (comprehensive user guide)
 
-### Original Documentation
+### Original Project Documentation
 - **Main Site**: http://tinylabs.io/openfixture
 - **BOM**: http://tinylabs.io/openfixture-bom
 - **Assembly**: http://tinylabs.io/openfixture-assembly
@@ -523,7 +578,7 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
 pip install tomli
 
 # Or run without config file
-python3 GenFixture.py --board test.kicad_pcb --mat_th 3.0 --out fixture
+python src/openfixture_support/GenFixture.py --board test.kicad_pcb --mat_th 3.0 --out fixture
 ```
 
 **"No test points found"**
@@ -549,7 +604,7 @@ plugins/
 
 Enable detailed logging for troubleshooting:
 ```bash
-python3 GenFixture.py --board test.kicad_pcb --mat_th 3.0 --out fixture --verbose
+python src/openfixture_support/GenFixture.py --board test.kicad_pcb --mat_th 3.0 --out fixture --verbose
 ```
 
 ---
@@ -559,7 +614,7 @@ python3 GenFixture.py --board test.kicad_pcb --mat_th 3.0 --out fixture --verbos
 ### Standard 1.6mm PCB, 3mm Acrylic
 
 ```bash
-python3 GenFixture.py \
+python src/openfixture_support/GenFixture.py \
     --board my_board.kicad_pcb \
     --mat_th 3.0 \
     --pcb_th 1.6 \
@@ -570,7 +625,7 @@ python3 GenFixture.py \
 ### Thin PCB, 2.5mm Acrylic
 
 ```bash
-python3 GenFixture.py \
+python src/openfixture_support/GenFixture.py \
     --board thin_board.kicad_pcb \
     --mat_th 2.45 \
     --pcb_th 0.8 \
@@ -581,7 +636,7 @@ python3 GenFixture.py \
 ### Bottom Side Testing
 
 ```bash
-python3 GenFixture.py \
+python src/openfixture_support/GenFixture.py \
     --board my_board.kicad_pcb \
     --mat_th 3.0 \
     --layer B.Cu \
@@ -593,7 +648,7 @@ python3 GenFixture.py \
 ```bash
 # Create fixture_config.toml with your parameters
 # Then simply run:
-python3 GenFixture.py \
+python src/openfixture_support/GenFixture.py \
     --board my_board.kicad_pcb \
     --config fixture_config.toml \
     --out fixture
@@ -621,12 +676,17 @@ See: https://creativecommons.org/licenses/by-sa/4.0/
 
 **Original Author**:
 - Elliot Buller - Tiny Labs Inc (elliot@tinylabs.io)
-- Project Website: http://tinylabs.io/openfixture
+- Original Project Website: http://tinylabs.io/openfixture
 
-**Modernization & KiCAD 9+ Compatibility** (February 2026):
-- For contributions, please use GitHub pull requests
+**Current Maintainer**:
+- Roland Wa (gitrepository Team)
+- Repository: https://github.com/RolandWa/openfixture
+
+**Modernization & KiCAD 9+ Compatibility** (2024-2026):
+- For contributions, please use GitHub pull requests at https://github.com/RolandWa/openfixture
 
 **Key Updates**:
+- ✅ **Modern Python src-layout** - Clean separation with build system (build.py)
 - ✅ **KiCAD 9.0+ Full Compatibility** - All breaking API changes fixed with backward compatibility for KiCAD 8.0
 - ✅ **Enhanced OpenSCAD Integration** - Robust subprocess execution with proper error handling, timeouts, and path resolution
 - ✅ **Python 3.11+ Modernization** - Type hints, pathlib, dataclasses, comprehensive logging
@@ -639,6 +699,7 @@ See: https://creativecommons.org/licenses/by-sa/4.0/
 
 ## 🔗 Links
 
+- **GitHub Repository**: https://github.com/RolandWa/openfixture
 - **Original Project**: http://tinylabs.io/openfixture
 - **OpenSCAD**: https://openscad.org/
 - **KiCAD**: https://www.kicad.org/
@@ -689,14 +750,15 @@ See: https://creativecommons.org/licenses/by-sa/4.0/
 ## 🆘 Getting Help
 
 1. Check **[POGO_PINS.md](POGO_PINS.md)** for pogo pin selection, installation, and troubleshooting
-2. Check **[copilot-instructions_openfixture.md](copilot-instructions_openfixture.md)** for detailed documentation
+2. Check **[.github/copilot-instructions.md](.github/copilot-instructions.md)** for project structure and development guidelines
 3. Review **[MIGRATION_GUIDE.md](MIGRATION_GUIDE.md)** if upgrading from v1
-3. Enable `--verbose` logging to diagnose issues
-4. Check original docs: http://tinylabs.io/openfixture
-5. Verify KiCAD version compatibility (v2 requires 8.0+)
+4. Enable `--verbose` logging to diagnose issues
+5. Check GitHub Issues: https://github.com/RolandWa/openfixture/issues
+6. Review documentation: https://github.com/RolandWa/openfixture/tree/main/README.md
+7. Original project documentation: http://tinylabs.io/openfixture
 
 ---
 
-**Version**: 2.0.0  
-**Last Updated**: February 15, 2026  
+**Version**: 1.0.0  
+**Last Updated**: January 2025  
 **Compatibility**: KiCAD 8.0+, Python 3.8+, OpenSCAD 2015.03+

@@ -65,31 +65,33 @@ if (-not (Test-Path $SupportDir)) {
     Write-Host "[*] Created support directory: openfixture_support" -ForegroundColor Gray
 }
 
+# Source directory (new src-layout structure)
+$SrcDir = Join-Path $RepoDir "src"
+
 # Plugin files to sync to KiCad plugins directory (flat structure)
 $PluginFiles = @(
-    "openfixture.py",
-    "OpenFixture.png"
+    @{Src = "src\openfixture.py"; Dest = "openfixture.py"},
+    @{Src = "OpenFixture.png"; Dest = "OpenFixture.png"}
 )
 
 # Supporting files to sync to support subdirectory
 $SupportFiles = @(
-    "GenFixture.py",
-    "openfixture.scad",
-    "glaser-stencil-d.ttf",
-    "osh_logo.dxf",
-    "fixture_config.toml",
-    "genfixture.bat",
-    "genfixture.sh"
+    @{Src = "src\openfixture_support\GenFixture.py"; Dest = "GenFixture.py"},
+    @{Src = "src\openfixture_support\openfixture.scad"; Dest = "openfixture.scad"},
+    @{Src = "src\openfixture_support\fixture_config.toml"; Dest = "fixture_config.toml"},
+    @{Src = "src\openfixture_support\__init__.py"; Dest = "__init__.py"},
+    @{Src = "glaser-stencil-d.ttf"; Dest = "glaser-stencil-d.ttf"},
+    @{Src = "osh_logo.dxf"; Dest = "osh_logo.dxf"},
+    @{Src = "genfixture.bat"; Dest = "genfixture.bat"},
+    @{Src = "genfixture.sh"; Dest = "genfixture.sh"}
 )
 
 # Documentation files to sync to support subdirectory
 $DocumentationFiles = @(
-    "README.md",
-    "POGO_PINS.md",
-    "MIGRATION_GUIDE.md",
-    "MODERNIZATION_SUMMARY.md",
-    "SECURITY.md",
-    "copilot-instructions_openfixture.md"
+    @{Src = "README.md"; Dest = "README.md"},
+    @{Src = "POGO_PINS.md"; Dest = "POGO_PINS.md"},
+    @{Src = "MIGRATION_GUIDE.md"; Dest = "MIGRATION_GUIDE.md"},
+    @{Src = "SECURITY.md"; Dest = "SECURITY.md"}
 )
 
 $PluginSynced = 0
@@ -100,24 +102,25 @@ $FailedCount = 0
 # Sync plugin files to main plugins directory
 Write-Host "[*] Plugin Files:" -ForegroundColor Cyan
 foreach ($File in $PluginFiles) {
-    $SourcePath = Join-Path $RepoDir $File
+    $SourcePath = Join-Path $RepoDir $File.Src
+    $DestFile = $File.Dest
     
     if (Test-Path $SourcePath) {
         try {
-            Copy-Item $SourcePath -Destination $PluginsDir -Force
-            $FileInfo = Get-Item (Join-Path $PluginsDir $File)
+            Copy-Item $SourcePath -Destination (Join-Path $PluginsDir $DestFile) -Force
+            $FileInfo = Get-Item (Join-Path $PluginsDir $DestFile)
             $SizeKB = [math]::Round($FileInfo.Length / 1KB, 2)
-            Write-Host "   [OK] $File ($SizeKB" "KB)" -ForegroundColor Green
+            Write-Host "   [OK] $DestFile ($SizeKB" "KB)" -ForegroundColor Green
             $PluginSynced++
         }
         catch {
-            Write-Host "   [FAIL] Failed to copy $File" -ForegroundColor Red
+            Write-Host "   [FAIL] Failed to copy $DestFile" -ForegroundColor Red
             Write-Host "      Error: $_" -ForegroundColor Yellow
             $FailedCount++
         }
     }
     else {
-        Write-Host "   [WARN] $File not found in repository" -ForegroundColor Yellow
+        Write-Host "   [WARN] $($File.Src) not found in repository" -ForegroundColor Yellow
         $FailedCount++
     }
 }
@@ -125,24 +128,25 @@ foreach ($File in $PluginFiles) {
 # Sync supporting files
 Write-Host "`n[*] Supporting Files:" -ForegroundColor Cyan
 foreach ($File in $SupportFiles) {
-    $SourcePath = Join-Path $RepoDir $File
+    $SourcePath = Join-Path $RepoDir $File.Src
+    $DestFile = $File.Dest
     
     if (Test-Path $SourcePath) {
         try {
-            Copy-Item $SourcePath -Destination $SupportDir -Force
-            $FileInfo = Get-Item (Join-Path $SupportDir $File)
+            Copy-Item $SourcePath -Destination (Join-Path $SupportDir $DestFile) -Force
+            $FileInfo = Get-Item (Join-Path $SupportDir $DestFile)
             $SizeKB = [math]::Round($FileInfo.Length / 1KB, 2)
-            Write-Host "   [OK] $File ($SizeKB" "KB)" -ForegroundColor Green
+            Write-Host "   [OK] $DestFile ($SizeKB" "KB)" -ForegroundColor Green
             $SupportSynced++
         }
         catch {
-            Write-Host "   [FAIL] Failed to copy $File" -ForegroundColor Red
+            Write-Host "   [FAIL] Failed to copy $DestFile" -ForegroundColor Red
             Write-Host "      Error: $_" -ForegroundColor Yellow
             $FailedCount++
         }
     }
     else {
-        Write-Host "   [WARN] $File not found in repository" -ForegroundColor Yellow
+        Write-Host "   [WARN] $($File.Src) not found in repository" -ForegroundColor Yellow
         $FailedCount++
     }
 }
@@ -150,24 +154,25 @@ foreach ($File in $SupportFiles) {
 # Sync documentation files
 Write-Host "`n[*] Documentation Files:" -ForegroundColor Cyan
 foreach ($File in $DocumentationFiles) {
-    $SourcePath = Join-Path $RepoDir $File
+    $SourcePath = Join-Path $RepoDir $File.Src
+    $DestFile = $File.Dest
     
     if (Test-Path $SourcePath) {
         try {
-            Copy-Item $SourcePath -Destination $SupportDir -Force
-            $FileInfo = Get-Item (Join-Path $SupportDir $File)
+            Copy-Item $SourcePath -Destination (Join-Path $SupportDir $DestFile) -Force
+            $FileInfo = Get-Item (Join-Path $SupportDir $DestFile)
             $SizeKB = [math]::Round($FileInfo.Length / 1KB, 2)
-            Write-Host "   [OK] $File ($SizeKB" "KB)" -ForegroundColor Green
+            Write-Host "   [OK] $DestFile ($SizeKB" "KB)" -ForegroundColor Green
             $DocsSynced++
         }
         catch {
-            Write-Host "   [FAIL] Failed to copy $File" -ForegroundColor Red
+            Write-Host "   [FAIL] Failed to copy $DestFile" -ForegroundColor Red
             Write-Host "      Error: $_" -ForegroundColor Yellow
             $FailedCount++
         }
     }
     else {
-        Write-Host "   ⚠️  $File not found in repository" -ForegroundColor Yellow
+        Write-Host "   ⚠️  $($File.Src) not found in repository" -ForegroundColor Yellow
         $FailedCount++
     }
 }

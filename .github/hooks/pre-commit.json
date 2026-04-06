@@ -1,0 +1,40 @@
+{
+  "name": "pre-commit-python-format",
+  "description": "Format Python files and validate syntax before commits",
+  "hook": "PreCommit",
+  "commands": [
+    {
+      "name": "Format Python files",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "& { Get-ChildItem -Path . -Filter '*.py' -Recurse -Exclude '__pycache__','.*' | Where-Object { $_.DirectoryName -notmatch '__pycache__|^\\..*' } | ForEach-Object { Write-Host \"Checking $($_.Name)...\"; python -m py_compile $_.FullName; if ($LASTEXITCODE -ne 0) { exit 1 } } }"
+      ],
+      "continueOnError": false,
+      "message": "✅ Python syntax validation passed"
+    },
+    {
+      "name": "Check for personal config files",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "& { $files = git diff --cached --name-only --diff-filter=ACM | Select-String -Pattern 'sync_to_kicad_config.ps1$|.*_config\\.ps1$' -NotMatch '*template*'; if ($files) { Write-Host '❌ ERROR: Attempting to commit personal config file'; Write-Host $files; exit 1 } else { Write-Host '✅ No personal config files in commit'; exit 0 } }"
+      ],
+      "continueOnError": false,
+      "message": "✅ Security check passed"
+    },
+    {
+      "name": "Verify TOML syntax",
+      "command": "pwsh",
+      "args": [
+        "-NoProfile",
+        "-Command",
+        "& { $tomlFiles = git diff --cached --name-only --diff-filter=ACM | Select-String -Pattern '\\.toml$'; if ($tomlFiles) { foreach ($file in $tomlFiles) { Write-Host \"Validating $file...\"; python -c \"try:\\n    import tomllib\\nexcept ImportError:\\n    try:\\n        import tomli as tomllib\\n    except ImportError:\\n        print('⚠️  Warning: Cannot validate TOML (tomli not installed)'); exit(0)\\nwith open('$file', 'rb') as f:\\n    tomllib.load(f)\\nprint('✅ Valid TOML')\"; if ($LASTEXITCODE -ne 0) { exit 1 } } } else { Write-Host '✅ No TOML files to validate' } }"
+      ],
+      "continueOnError": true,
+      "message": "TOML validation complete"
+    }
+  ]
+}

@@ -21,7 +21,7 @@ Modernization & v2 Update:
 License: CC-BY-SA 4.0
 """
 
-__version__ = "2.0.0"
+__version__ = "1.0.0"
 __author__ = "Elliot Buller, Community Contributors"
 __license__ = "CC-BY-SA-4.0"
 
@@ -583,16 +583,9 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
         self.description = "Generate laser-cuttable PCB test fixtures automatically"
         self.show_toolbar_button = True
         
-        # Icon file - check if it exists before setting
-        icon_path = os.path.join(os.path.dirname(__file__), "OpenFixture.png")
-        if os.path.exists(icon_path):
-            self.icon_file_name = icon_path
-        else:
-            # Check openfixture_support subdirectory
-            icon_path_alt = os.path.join(os.path.dirname(__file__), "openfixture_support", "OpenFixture.png")
-            if os.path.exists(icon_path_alt):
-                self.icon_file_name = icon_path_alt
-            # If no icon found, KiCAD will use default icon
+        # Set plugin directory and icon (following OrthoRoute pattern)
+        self.plugin_dir = os.path.dirname(os.path.abspath(__file__))
+        self.icon_file_name = os.path.join(self.plugin_dir, "OpenFixture.png")
     
     def Run(self):
         """Main plugin entry point"""

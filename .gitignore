@@ -92,9 +92,7 @@ fixture*/
 *-fixture/
 *.dxf
 !osh_logo.dxf
-!rfid_fob-outline.dxf
 *.stl
-!openfixture.stl
 
 # OpenSCAD temporary files
 *.scad~
