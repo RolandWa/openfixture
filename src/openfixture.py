@@ -115,7 +115,7 @@ class OpenFixtureDialog(wx.Dialog):
     Replaces auto-generated OpenFixtureDlg with better UX
     """
     
-    def __init__(self, parent, board_path: str):
+    def __init__(self, parent, board_path: str, board=None):
         wx.Dialog.__init__(
             self, 
             parent, 
@@ -128,6 +128,26 @@ class OpenFixtureDialog(wx.Dialog):
         
         self.board_path = board_path
         self.board_name = Path(board_path).stem
+        self.board = board
+        
+        # Extract revision from KiCAD title block
+        self.extracted_revision = "rev_01"  # Default fallback
+        if self.board:
+            try:
+                title_block = self.board.GetTitleBlock()
+                kicad_rev = title_block.GetRevision()
+                if kicad_rev and kicad_rev.strip():
+                    # Clean up revision: remove spaces, ensure format
+                    self.extracted_revision = kicad_rev.strip().replace(" ", "_")
+                    # Add "rev_" prefix if not present
+                    if not self.extracted_revision.lower().startswith("rev"):
+                        self.extracted_revision = f"rev_{self.extracted_revision}"
+                    logger.info(f"Extracted revision from title block: {self.extracted_revision}")
+            except Exception as e:
+                logger.warning(f"Could not extract revision from title block: {e}")
+        
+        # Track manual edits to output folder
+        self.output_manual_edit = False
         
         # Load configuration if available
         self.config_path = None
@@ -194,8 +214,11 @@ class OpenFixtureDialog(wx.Dialog):
         output_label = wx.StaticText(self, wx.ID_ANY, "Output:")
         output_sizer.Add(output_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
         
-        self.output_text = wx.TextCtrl(self, wx.ID_ANY, f"fixture-rev_01")
+        self.output_text = wx.TextCtrl(self, wx.ID_ANY, f"fixture-{self.extracted_revision}")
         output_sizer.Add(self.output_text, 1, wx.ALL, 5)
+        
+        # Bind event to track manual edits
+        self.output_text.Bind(wx.EVT_TEXT, self._on_output_changed)
         
         main_sizer.Add(output_sizer, 0, wx.ALL | wx.EXPAND, 5)
         
@@ -234,8 +257,12 @@ class OpenFixtureDialog(wx.Dialog):
         rev_sizer = wx.BoxSizer(wx.HORIZONTAL)
         rev_sizer.Add(wx.StaticText(panel, wx.ID_ANY, "Revision:"), 0,
                      wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
-        self.revision = wx.TextCtrl(panel, wx.ID_ANY, "rev_01")
+        self.revision = wx.TextCtrl(panel, wx.ID_ANY, self.extracted_revision)
         rev_sizer.Add(self.revision, 1, wx.ALL, 5)
+        
+        # Bind event to auto-update output folder
+        self.revision.Bind(wx.EVT_TEXT, self._on_revision_changed)
+        
         sizer.Add(rev_sizer, 0, wx.EXPAND)
         
         sizer.Add(wx.StaticLine(panel), 0, wx.EXPAND | wx.ALL, 10)
@@ -456,6 +483,26 @@ class OpenFixtureDialog(wx.Dialog):
             # If unchecking bottom and top is not checked, recheck bottom (at least one must be selected)
             self.layer_bottom.SetValue(True)
     
+    def _on_revision_changed(self, event):
+        """Auto-update output folder when revision changes"""
+        if not self.output_manual_edit:
+            # Auto-update output folder with new revision
+            new_revision = self.revision.GetValue().strip()
+            if new_revision:
+                # Use ChangeValue to avoid triggering EVT_TEXT on output field
+                self.output_text.ChangeValue(f"fixture-{new_revision}")
+    
+    def _on_output_changed(self, event):
+        """Track manual edits to output folder"""
+        # Check if the change matches the auto-generated pattern
+        current_rev = self.revision.GetValue().strip()
+        current_output = self.output_text.GetValue().strip()
+        expected_output = f"fixture-{current_rev}"
+        
+        # If output doesn't match auto-generated pattern, mark as manually edited
+        if current_output != expected_output:
+            self.output_manual_edit = True
+    
     def _load_defaults(self):
         """Load default values from config file if available"""
         if not self.config_path:
@@ -614,7 +661,7 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
                 return
             
             # Show dialog
-            dialog = OpenFixtureDialog(pcbnew_frame, board_path)
+            dialog = OpenFixtureDialog(pcbnew_frame, board_path, board)
             
             if dialog.ShowModal() == wx.ID_OK:
                 params = dialog.get_parameters()
