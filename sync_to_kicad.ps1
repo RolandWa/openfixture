@@ -46,8 +46,14 @@ if (Test-Path $ConfigFile) {
     }
 }
 
-# OpenFixture support files directory (for scripts, SCAD, etc.)
-$SupportDir = Join-Path $PluginsDir "openfixture_support"
+# Plugin directory name (matches build.py)
+$PluginDirName = "com_github_RolandWa_openfixture"
+
+# Full plugin directory path
+$PluginInstallDir = Join-Path $PluginsDir $PluginDirName
+
+# Support files subdirectory (inside plugin directory)
+$SupportDir = Join-Path $PluginInstallDir "openfixture_support"
 
 Write-Host "`n[*] Synchronizing OpenFixture Plugin to KiCad...`n" -ForegroundColor Cyan
 
@@ -59,6 +65,12 @@ if (-not (Test-Path $PluginsDir)) {
     exit 1
 }
 
+# Create plugin directory if it doesn't exist
+if (-not (Test-Path $PluginInstallDir)) {
+    New-Item -ItemType Directory -Path $PluginInstallDir -Force | Out-Null
+    Write-Host "[*] Created plugin directory: $PluginDirName" -ForegroundColor Gray
+}
+
 # Create support directory if it doesn't exist
 if (-not (Test-Path $SupportDir)) {
     New-Item -ItemType Directory -Path $SupportDir -Force | Out-Null
@@ -67,14 +79,19 @@ if (-not (Test-Path $SupportDir)) {
 
 # Source directory (new src-layout structure)
 $SrcDir = Join-Path $RepoDir "src"
+$BuildDir = Join-Path $RepoDir "build"
+$BuildPluginDir = Join-Path $BuildDir $PluginDirName
 
-# Plugin files to sync to KiCad plugins directory (flat structure)
+# Plugin files to sync to plugin directory (com_github_RolandWa_openfixture/)
 $PluginFiles = @(
     @{Src = "src\openfixture.py"; Dest = "openfixture.py"},
-    @{Src = "OpenFixture.png"; Dest = "OpenFixture.png"}
+    @{Src = "OpenFixture.png"; Dest = "OpenFixture.png"},
+    @{Src = "build\$PluginDirName\__init__.py"; Dest = "__init__.py"},
+    @{Src = "build\$PluginDirName\plugin.json"; Dest = "plugin.json"},
+    @{Src = "build\$PluginDirName\metadata.json"; Dest = "metadata.json"}
 )
 
-# Supporting files to sync to support subdirectory
+# Supporting files to sync to openfixture_support subdirectory
 $SupportFiles = @(
     @{Src = "src\openfixture_support\GenFixture.py"; Dest = "GenFixture.py"},
     @{Src = "src\openfixture_support\openfixture.scad"; Dest = "openfixture.scad"},
@@ -86,9 +103,10 @@ $SupportFiles = @(
     @{Src = "genfixture.sh"; Dest = "genfixture.sh"}
 )
 
-# Documentation files to sync to support subdirectory
+# Documentation files to sync to plugin directory (same level as openfixture.py)
 $DocumentationFiles = @(
     @{Src = "README.md"; Dest = "README.md"},
+    @{Src = "LICENSE.md"; Dest = "LICENSE.md"},
     @{Src = "POGO_PINS.md"; Dest = "POGO_PINS.md"},
     @{Src = "MIGRATION_GUIDE.md"; Dest = "MIGRATION_GUIDE.md"},
     @{Src = "SECURITY.md"; Dest = "SECURITY.md"}
@@ -99,7 +117,7 @@ $SupportSynced = 0
 $DocsSynced = 0
 $FailedCount = 0
 
-# Sync plugin files to main plugins directory
+# Sync plugin files to plugin directory (com_github_RolandWa_openfixture/)
 Write-Host "[*] Plugin Files:" -ForegroundColor Cyan
 foreach ($File in $PluginFiles) {
     $SourcePath = Join-Path $RepoDir $File.Src
@@ -107,8 +125,8 @@ foreach ($File in $PluginFiles) {
     
     if (Test-Path $SourcePath) {
         try {
-            Copy-Item $SourcePath -Destination (Join-Path $PluginsDir $DestFile) -Force
-            $FileInfo = Get-Item (Join-Path $PluginsDir $DestFile)
+            Copy-Item $SourcePath -Destination (Join-Path $PluginInstallDir $DestFile) -Force
+            $FileInfo = Get-Item (Join-Path $PluginInstallDir $DestFile)
             $SizeKB = [math]::Round($FileInfo.Length / 1KB, 2)
             Write-Host "   [OK] $DestFile ($SizeKB" "KB)" -ForegroundColor Green
             $PluginSynced++
@@ -151,7 +169,7 @@ foreach ($File in $SupportFiles) {
     }
 }
 
-# Sync documentation files
+# Sync documentation files to plugin directory (same level as openfixture.py)
 Write-Host "`n[*] Documentation Files:" -ForegroundColor Cyan
 foreach ($File in $DocumentationFiles) {
     $SourcePath = Join-Path $RepoDir $File.Src
@@ -159,8 +177,8 @@ foreach ($File in $DocumentationFiles) {
     
     if (Test-Path $SourcePath) {
         try {
-            Copy-Item $SourcePath -Destination (Join-Path $SupportDir $DestFile) -Force
-            $FileInfo = Get-Item (Join-Path $SupportDir $DestFile)
+            Copy-Item $SourcePath -Destination (Join-Path $PluginInstallDir $DestFile) -Force
+            $FileInfo = Get-Item (Join-Path $PluginInstallDir $DestFile)
             $SizeKB = [math]::Round($FileInfo.Length / 1KB, 2)
             Write-Host "   [OK] $DestFile ($SizeKB" "KB)" -ForegroundColor Green
             $DocsSynced++
@@ -192,13 +210,13 @@ Write-Host "`n[*] Clearing Python cache..." -ForegroundColor Cyan
 $CacheCleared = 0
 
 # Remove __pycache__ directories
-Get-ChildItem -Path $PluginsDir -Filter "__pycache__" -Directory -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
+Get-ChildItem -Path $PluginInstallDir -Filter "__pycache__" -Directory -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
     Remove-Item $_.FullName -Recurse -Force -ErrorAction SilentlyContinue
     $CacheCleared++
 }
 
 # Remove .pyc files
-Get-ChildItem -Path $PluginsDir -Filter "*.pyc" -File -ErrorAction SilentlyContinue | ForEach-Object {
+Get-ChildItem -Path $PluginInstallDir -Filter "*.pyc" -File -Recurse -ErrorAction SilentlyContinue | ForEach-Object {
     Remove-Item $_.FullName -Force -ErrorAction SilentlyContinue
     $CacheCleared++
 }
@@ -210,11 +228,11 @@ if ($CacheCleared -gt 0) {
 }
 
 Write-Host "`n[*] File Locations:" -ForegroundColor Cyan
-Write-Host "   Plugin Directory: $PluginsDir" -ForegroundColor Gray
+Write-Host "   Plugin Directory: $PluginInstallDir" -ForegroundColor Gray
 Write-Host "   Support Directory: $SupportDir" -ForegroundColor Gray
 
 Write-Host "`nTips:" -ForegroundColor Yellow
 Write-Host "   - Restart KiCad to reload the updated plugin" -ForegroundColor Gray
 Write-Host "   - OpenFixture is fully compatible with KiCad 8.0 and 9.0+" -ForegroundColor Gray
-Write-Host "   - Supporting files (scripts, configs) are in openfixture_support\" -ForegroundColor Gray
+Write-Host "   - Structure matches build.py: $PluginDirName\" -ForegroundColor Gray
 Write-Host ""
