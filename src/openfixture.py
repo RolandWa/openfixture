@@ -130,11 +130,20 @@ class OpenFixtureDialog(wx.Dialog):
         self.board_name = Path(board_path).stem
         self.board = board
         
-        # Extract revision from KiCAD title block
+        # Extract title and revision from KiCAD title block
+        self.extracted_title = self.board_name  # Default fallback to filename
         self.extracted_revision = "rev_01"  # Default fallback
         if self.board:
             try:
                 title_block = self.board.GetTitleBlock()
+                
+                # Extract title
+                kicad_title = title_block.GetTitle()
+                if kicad_title and kicad_title.strip():
+                    self.extracted_title = kicad_title.strip()
+                    logger.info(f"Extracted title from title block: {self.extracted_title}")
+                
+                # Extract revision
                 kicad_rev = title_block.GetRevision()
                 if kicad_rev and kicad_rev.strip():
                     # Clean up revision: remove spaces, ensure format
@@ -144,7 +153,7 @@ class OpenFixtureDialog(wx.Dialog):
                         self.extracted_revision = f"rev_{self.extracted_revision}"
                     logger.info(f"Extracted revision from title block: {self.extracted_revision}")
             except Exception as e:
-                logger.warning(f"Could not extract revision from title block: {e}")
+                logger.warning(f"Could not extract title/revision from title block: {e}")
         
         # Track manual edits to output folder
         self.output_manual_edit = False
@@ -182,6 +191,17 @@ class OpenFixtureDialog(wx.Dialog):
         # Board info
         board_info = wx.StaticText(self, wx.ID_ANY, f"Board: {self.board_name}")
         main_sizer.Add(board_info, 0, wx.ALL | wx.EXPAND, 10)
+        
+        # Project title (editable)
+        title_sizer = wx.BoxSizer(wx.HORIZONTAL)
+        title_label = wx.StaticText(self, wx.ID_ANY, "Project Title:")
+        title_sizer.Add(title_label, 0, wx.ALIGN_CENTER_VERTICAL | wx.ALL, 5)
+        
+        self.project_title = wx.TextCtrl(self, wx.ID_ANY, self.extracted_title)
+        self.project_title.SetToolTip("Project title from KiCAD title block (editable)")
+        title_sizer.Add(self.project_title, 1, wx.ALL, 5)
+        
+        main_sizer.Add(title_sizer, 0, wx.LEFT | wx.RIGHT | wx.EXPAND, 10)
         
         if self.config_path:
             config_info = wx.StaticText(self, wx.ID_ANY, f"Config: {Path(self.config_path).name}")
@@ -597,6 +617,7 @@ class OpenFixtureDialog(wx.Dialog):
         
         return {
             'board': self.board_path,
+            'title': self.project_title.GetValue(),
             'pcb_th': self.pcb_thickness.GetValue(),
             'mat_th': self.material_thickness.GetValue(),
             'rev': self.revision.GetValue(),
