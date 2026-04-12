@@ -920,8 +920,16 @@ class GenFixture:
             args_dict['pcb_track'] = track_path
         
         # Optional parameters - store raw values
-        if self.config.rev:
-            args_dict['rev'] = self.config.rev
+        rev = getattr(self.config, 'rev', None)
+        if rev:
+            args_dict['rev'] = rev
+        title = getattr(self.config, 'title', None)
+        if title and title.strip():
+            # Sanitize title: limit length for engraving readability
+            # Allowed: letters, numbers, spaces, colons, and most punctuation
+            # Escaping of quotes/backslashes happens in _run_openscad()
+            sanitized_title = title.strip()[:50]  # Max 50 chars fits on fixture plate
+            args_dict['title'] = sanitized_title
         if self.config.washer_th:
             args_dict['washer_th'] = f"{float(self.config.washer_th):.02f}"
         if self.config.nut_f2f:
@@ -1036,8 +1044,10 @@ class GenFixture:
                         # Numeric string - no quotes (OpenSCAD needs bare numbers)
                         cmd.extend(['-D', f'{key}={value}'])
                     except ValueError:
-                        # Non-numeric string - add quotes
-                        cmd.extend(['-D', f'{key}="{value}"'])
+                        # Non-numeric string - escape and add quotes
+                        # Escape backslashes first, then quotes (order matters!)
+                        escaped_value = value.replace('\\', '\\\\').replace('"', '\\"')
+                        cmd.extend(['-D', f'{key}="{escaped_value}"'])
             else:
                 # Numeric value - no quotes
                 cmd.extend(['-D', f'{key}={value}'])
@@ -1107,6 +1117,8 @@ def main():
                        help='Ignore layer: Eco1.User or Eco2.User')
     parser.add_argument('--rev',
                        help='Override revision string')
+    parser.add_argument('--title',
+                       help='Project title string')
     parser.add_argument('--washer_th', type=float,
                        help='Washer thickness for hinge in mm')
     parser.add_argument('--nut_f2f', type=float,
@@ -1175,6 +1187,8 @@ def main():
         config.screw_d = args.screw_d
     if args.rev:
         config.rev = args.rev
+    if args.title:
+        config.title = args.title
     if args.washer_th:
         config.washer_th = args.washer_th
     if args.nut_f2f:

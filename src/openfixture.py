@@ -949,6 +949,7 @@ class OpenFixturePlugin(pcbnew.ActionPlugin):
             '--washer_th', params['washer_th'],
             '--border', params['border'],
             '--pogo-uncompressed-length', params['pogo_length'],
+            '--title', params['title'],
         ]
         
         # Add verbose flag if enabled

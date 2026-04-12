@@ -70,8 +70,9 @@ logo_offset_x = -72.0;            // Logo X offset (after scaling)
 logo_offset_y = -66.0;            // Logo Y offset (after scaling)
 logo_offset_z = 0.0;              // Logo Z offset (after scaling)
 
-// PCB revision
-rev = "rev.1";
+// Project title and PCB revision
+title = "PCB Test Fixture 1:200";  // Project title from KiCAD title block
+rev = "rev.1";              // PCB revision from KiCAD title block
 
 // PCB Dimensions (in mm)
 // NOTE: When using GenFixture.py, these values are automatically overridden
@@ -432,11 +433,16 @@ module head_base ()
         translate ([head_x + mat_th + washer_th, head_y / 12 - tab_width / 2])
         square ([mat_th, tab_width / 3]);
 
-        // Add revision backwards and upside down
-        translate ([head_x / 2, head_y - 25])
+        // Add title and revision backwards and upside down
+        translate ([head_x / 2, head_y - 20])
         rotate ([0, 0, 180])
         mirror ([1, 0, 0])
-        text (rev, font = FONTNAME, halign = "center", valign = "center", size = 6);
+        text (title, font = FONTNAME, halign = "center", valign = "center", size = 6);
+        
+        translate ([head_x / 2, head_y - 30])
+        rotate ([0, 0, 180])
+        mirror ([1, 0, 0])
+        text (rev, font = FONTNAME, halign = "center", valign = "center", size = 5);
     }
 }
 
@@ -784,10 +790,14 @@ module carrier (dxf_filename, pcb_x, pcb_y, border)
         linear_extrude (height = mat_th)
         tnut_hole ();
         
-        // Add revision ID, also allows to determine which side is top
-        translate ([x / 2, y - 25, 0])
+        // Add title and revision ID - allows to determine which side is top
+        translate ([x / 2, y - 20, 0])
         linear_extrude (height = mat_th)
-        text (rev, font = FONTNAME, halign = "center", valign = "center", size = 6);
+        text (title, font = FONTNAME, halign = "center", valign = "center", size = 6);
+        
+        translate ([x / 2, y - 30, 0])
+        linear_extrude (height = mat_th)
+        text (rev, font = FONTNAME, halign = "center", valign = "center", size = 5);
     }
 }
 
