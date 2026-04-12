@@ -172,6 +172,43 @@ outline_path.replace("\\", "/")
    - Rationale: Component body blocks access from same side
    - Example: Testing bottom layer → include PTH from top-side components only
 
+### Carrier Centering Algorithm for Scaled Cutouts
+
+**Critical geometry calculation** (module `carrier()` in openfixture.scad):
+
+**Problem**: When OpenSCAD scales a DXF with `scale([scale_x, scale_y])`, it scales **all coordinates** including the board origin position. For a centered carrier plate with inset border, simple offset formulas fail.
+
+**Example** (real-world values causing the bug):
+- Board origin in DXF: (155, 113) mm (absolute KiCAD coordinates)
+- Board size: (72, 45) mm  
+- Bottom carrier inset: 1 mm → scale_x = 0.972, scale_y = 0.978
+- Board center at: (155 + 72/2, 113 + 45/2) = (191, 135.5) mm
+- After scaling: (191 × 0.972, 135.5 × 0.978) = (185.65, 131.71) mm
+- **Shift needed**: 5.35 mm in X, 3.79 mm in Y
+
+**Correct formula**:
+```openscad
+sx_offset = (board_origin_x + pcb_x / 2) * (1 - scale_x);
+sy_offset = (board_origin_y + pcb_y / 2) * (1 - scale_y);
+```
+
+**Why it works**:
+1. `board_origin_x + pcb_x/2` = board center X in original coordinates
+2. When scaled by `scale_x`, center moves to `center * scale_x`
+3. Shift amount = `center - center * scale_x = center * (1 - scale_x)`
+4. Translation by this offset re-centers the scaled board
+
+**Why simple formulas fail**:
+- ❌ `(pcb_x - pcb_x * scale_x) / 2` - Only works when board origin is (0, 0)
+- ❌ `border / 2` - Doesn't account for scaling affecting board_origin
+- ✅ Must account for both board size AND board origin being scaled
+
+**Coordinate system evolution**:
+- Old versions (pre-KiCAD 9): Boards exported at (0, 0) → simple offset worked
+- KiCAD 9: Absolute coordinates (board_origin_x/y can be large) → needs full formula
+
+**Testing**: Use `mode = "check_aligned"` in OpenSCAD to verify cyan (bottom carrier) and magenta (top carrier) cutouts are perfectly concentric.
+
 ### Configuration Pattern
 
 **Priority**: CLI args > TOML config > hardcoded defaults

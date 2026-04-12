@@ -131,6 +131,37 @@
 - **Code**: Line 858 (3D), Line 933 (laser cut)
 - **NEW FEATURE**: Configurable inset for different board support needs
 
+#### Carrier Centering Algorithm
+
+**Critical implementation detail**: When creating carriers with inset borders, OpenSCAD's `scale()` affects ALL coordinates including the board origin position. The centering calculation must compensate for this:
+
+```openscad
+// Calculate scale factors for inset cutout
+scale_x = (pcb_x - 2 * border) / pcb_x;
+scale_y = (pcb_y - 2 * border) / pcb_y;
+
+// CRITICAL: Offset to re-center the scaled DXF
+// This accounts for board_origin being scaled along with the geometry
+sx_offset = (board_origin_x + pcb_x / 2) * (1 - scale_x);
+sy_offset = (board_origin_y + pcb_y / 2) * (1 - scale_y);
+
+// Apply transformation
+translate([sx_offset, sy_offset, 0])
+    scale([scale_x, scale_y, 1])
+        import(pcb_outline);
+```
+
+**Why this matters**:
+- KiCAD 9 exports DXFs with **absolute coordinates** (board_origin_x/y can be 100+ mm)
+- When OpenSCAD scales the DXF, the board's center point shifts
+- Formula calculates how much the center moves and compensates with translation
+- **Result**: Bottom carrier (1mm inset) and top carrier (0mm inset) are perfectly concentric
+
+**Verification**: Use `mode = "check_aligned"` to visually verify alignment in OpenSCAD:
+- Cyan = bottom carrier (smaller)
+- Magenta = top carrier (exact fit)  
+- Both should be perfectly centered on red/blue head plates
+
 ### BOARD 4: TOP CARRIER (PCB Clamp)
 - **Location**: Base assembly (Z=22mm absolute)
 - **Function**: Clamps PCB from above, prevents movement

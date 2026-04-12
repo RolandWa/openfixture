@@ -78,9 +78,30 @@ Z ≈ 22mm (head_base)                 ┌────────────�
                                      └─────────────────────────┘    Z = 0 (relative to head)
 ```
 
-## Critical Alignment Issue Identified
+## Critical Alignment Issues and Solutions
 
-### ❌ **PROBLEM: Head and Carriers Are NOT Aligned**
+### ✅ **SOLVED: Carrier Board Horizontal Alignment**
+
+**Problem**: Bottom carrier (1mm inset) was not concentric with top carrier (exact fit). Visible offset in all 4 directions.
+
+**Root cause**: OpenSCAD's `scale()` affects ALL coordinates, including the board origin position from KiCAD's absolute coordinate system.
+
+**Solution**: Compensate for scaled board origin when centering the cutout:
+```openscad
+sx_offset = (board_origin_x + pcb_x / 2) * (1 - scale_x);
+sy_offset = (board_origin_y + pcb_y / 2) * (1 - scale_y);
+```
+
+**Real-world example**:
+- Board origin: (155, 113) mm  
+- Board center: (155 + 72/2, 113 + 45/2) = (191, 135.5) mm
+- Scale factor: 0.972x (for 1mm inset on 72mm board)
+- Center after scaling: (185.65, 131.71) mm
+- **Required offset**: (5.35, 3.79) mm to re-center
+
+**Verification**: Use `mode = "check_aligned"` in OpenSCAD - cyan and magenta cutouts are now perfectly concentric.
+
+### ⚠️ **OPEN: Head and Carriers Vertical Alignment**
 
 **Expected PCB position:** Z = 22mm (between carriers)
 
